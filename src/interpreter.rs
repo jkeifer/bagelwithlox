@@ -15,10 +15,11 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&self, src: Source) {
+    pub fn interpret(&self, src: Source) -> Result<(), String> {
         let tokens = tokenize(src);
         let ast = parse(tokens);
         evaluate(ast);
+        Ok(())
     }
 }
 
