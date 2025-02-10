@@ -2,7 +2,7 @@ use super::tokenizer::Tokens;
 
 pub type AST = ();
 
-pub fn parse(tokens: Tokens) -> AST {
+pub fn parse(tokens: &Tokens) -> AST {
     println!("Parsing...");
 }
 
@@ -12,6 +12,6 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        parse(());
+        parse(&Tokens::new());
     }
 }

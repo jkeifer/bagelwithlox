@@ -1,7 +1,6 @@
-use super::reader::Source;
+use super::source::Source;
 use super::environment::Environment;
 use super::parser::parse;
-use super::tokenizer::tokenize;
 use super::evaluator::evaluate;
 
 pub struct Interpreter {
@@ -15,9 +14,9 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&self, src: Source) -> Result<(), String> {
-        let tokens = tokenize(src);
-        let ast = parse(tokens);
+    pub fn interpret(&self, src: &mut Source) -> Result<(), String> {
+        src.tokenize();
+        let ast = parse(src.get_tokens());
         evaluate(ast);
         Ok(())
     }
@@ -31,6 +30,8 @@ mod tests {
 
     #[test]
     fn test_interpret() {
-        Interpreter::new().interpret(());
+        Interpreter::new().interpret(
+            &mut Source::from_string("string".to_string()),
+        );
     }
 }

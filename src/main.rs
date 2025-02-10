@@ -3,7 +3,7 @@ use std::io;
 use std::io::Error;
 use std::io::IsTerminal;
 use std::io::prelude::*;
-use bagelwithlox::reader::Source;
+use bagelwithlox::source::Source;
 use bagelwithlox::interpreter::Interpreter;
 
 #[derive(Parser)]
@@ -22,7 +22,7 @@ impl Cli {
 
         if let Some(cmd) = &self.cmd {
             eprintln!("Reading from command option");
-            return Some(Ok(Source::from_string(&cmd)));
+            return Some(Ok(Source::from_string(cmd.to_string())));
         }
 
         if let Some(path) = &self.file {
@@ -40,7 +40,7 @@ impl Cli {
             Err(e) => return Some(Err(format!("Failed to read stdin: {}", e))),
         };
 
-        return Some(Ok(Source::from_string(&stdin)));
+        return Some(Ok(Source::from_string(stdin)));
     }
 }
 
@@ -65,7 +65,9 @@ fn repl(interpreter: &Interpreter) -> Result<(), String> {
             Err(e) => return Err(format!("Failed to read stdin: {}", e)),
             _ => (),
         }
-        if let Err(e) = interpreter.interpret(Source::from_string(&input)) {
+        if let Err(e) = interpreter.interpret(
+            &mut Source::from_string(input.to_string()),
+            ) {
             return Err(e);
         }
     }
@@ -78,9 +80,9 @@ fn main() {
 
     if let Some(src) = cli.get_source() {
         match src {
-            Ok(src) => {
+            Ok(mut src) => {
                 eprintln!("Got the following source content:\n'''\n{}\n'''", &src.get_content());
-                if let Err(e) = interpreter.interpret(src) {
+                if let Err(e) = interpreter.interpret(&mut src) {
                     eprintln!("ERROR: {}", e)
                 }
             },

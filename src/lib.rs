@@ -1,5 +1,5 @@
 pub mod environment;
-pub mod reader;
+pub mod source;
 pub mod tokenizer;
 pub mod parser;
 pub mod evaluator;
