@@ -2,6 +2,7 @@ use super::source::Source;
 use super::environment::Environment;
 use super::parser::parse;
 use super::evaluator::evaluate;
+use super::tokenizer::tokenize;
 
 pub struct Interpreter {
     environment: Environment,
@@ -15,8 +16,8 @@ impl Interpreter {
     }
 
     pub fn interpret(&self, src: &mut Source) -> Result<(), String> {
-        src.tokenize();
-        let ast = parse(src.get_tokens());
+        let tokens = tokenize(src)?;
+        let ast = parse(&tokens);
         evaluate(ast);
         Ok(())
     }

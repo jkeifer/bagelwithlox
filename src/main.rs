@@ -65,10 +65,15 @@ fn repl(interpreter: &Interpreter) -> Result<(), String> {
             Err(e) => return Err(format!("Failed to read stdin: {}", e)),
             _ => (),
         }
+
+        if input == "" {
+            return Ok(());
+        }
+
         if let Err(e) = interpreter.interpret(
             &mut Source::from_string(input.to_string()),
             ) {
-            return Err(e);
+            eprintln!("{}", e);
         }
     }
 }
@@ -81,7 +86,7 @@ fn main() {
     if let Some(src) = cli.get_source() {
         match src {
             Ok(mut src) => {
-                eprintln!("Got the following source content:\n'''\n{}\n'''", &src.get_content());
+                eprintln!("Got the following source content:\n'''\n{}\n'''", &src.content);
                 if let Err(e) = interpreter.interpret(&mut src) {
                     eprintln!("ERROR: {}", e)
                 }
