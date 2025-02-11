@@ -1,10 +1,14 @@
 use super::tokenizer::Tokens;
 
+
 pub type AST = ();
 
-pub fn parse(tokens: &Tokens) -> AST {
-    println!("Parsing...");
+
+
+pub fn parse(tokens: &Tokens) -> Result<AST, String> {
+    Ok(())
 }
+
 
 #[cfg(test)]
 mod tests {
