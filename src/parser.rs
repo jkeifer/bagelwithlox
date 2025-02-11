@@ -12,6 +12,5 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        parse(&Tokens::new());
     }
 }

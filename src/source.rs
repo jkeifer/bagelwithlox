@@ -1,15 +1,16 @@
 use std::fs;
+use std::rc::Rc;
 
 pub struct Source {
     pub filename: String,
-    pub content: String,
+    pub content: Rc<String>,
 }
 
 impl Source {
     fn new(filename: String, content: String) -> Source {
         Source{
             filename,
-            content,
+            content: Rc::new(content),
         }
     }
 
