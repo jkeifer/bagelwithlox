@@ -3,9 +3,6 @@ use super::ast::{AST, Expr, Operator};
 use super::tokenizer::{Tokens, Token};
 
 
-//pub type AST = ();
-
-
 pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, String> {
     let mut token_iter = tokens.iter().peekable();
 
@@ -15,8 +12,9 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, String> {
         return Err(String::from("Failed to parse all tokens"));
     }
 
-    Ok(expr)
+    Ok(AST::new(expr ))
 }
+
 
 fn expression<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
@@ -24,6 +22,7 @@ where
 {
     equality(token_iter)
 }
+
 
 fn equality<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
@@ -42,6 +41,7 @@ where
         Ok(expr)
     }
 }
+
 
 fn comparison<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
@@ -63,6 +63,7 @@ where
     }
 }
 
+
 fn term<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, String>
 where
     I: Iterator<Item = &'b Token<'b>>
@@ -81,6 +82,7 @@ where
     }
 }
 
+
 fn factor<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
     I: Iterator<Item = &'b Token<'b>>
@@ -98,6 +100,7 @@ where
     }
 }
 
+
 fn unary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
     I: Iterator<Item = &'b Token<'b>>
@@ -113,6 +116,7 @@ where
         primary(token_iter)
     }
 }
+
 
 fn primary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
@@ -133,6 +137,7 @@ where
    group(token_iter)
 }
 
+
 fn group<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
     I: Iterator<Item = &'b Token<'b>>
@@ -152,78 +157,6 @@ where
 
     Ok(Expr::Group { expr: Box::new(expr) })
 }
-
-    //fn parse_expression(&mut self) -> Result<Expr, String> {
-    //    let left = Box::new(self.parse_term()?);
-    //    let op = match self.currentext() {
-    //        Some(token) => token,
-    //        _ => return Ok(left),
-    //    };
-    //    match op {
-    //        op if is_binary_operator => Ok(Expr::BinOp{
-    //            op,
-    //            left,
-    //            right: Box::new(self.parse_term()?),
-    //        }),
-    //        Token::MINUS => Ok(Expr::Sub(Box::new(left), Box::new(self.parse_term()?))),
-    //        Token::TIMES => Ok(Expr::Mul(Box::new(left), Box::new(self.parse_term()?))),
-    //        Token::ASSIGN => Ok(Expr::Assign(Box::new(left), Box::new(self.parse_expression()?))),
-    //        other => Err(format!("Unknown token: {}", other)),
-    //    }
-    //}
-
-    //fn parse_term(&mut self) -> Result<Expression, Error> {
-    //    let token = match self.currentext() {
-    //        Some(token) => token,
-    //        _ => return Err(
-    //            Error::new(
-    //                ErrorKind::InvalidInput,
-    //                format!("Expected a term"),
-    //            ),
-    //        ),
-    //    };
-    //    match token {
-    //        Token::NUM(val) => Ok(Expression::Number(*val)),
-    //        Token::NAME(val) => Ok(Expression::Variable(val.to_owned())),
-    //        Token::LPAREN => {
-    //            let e = self.parse_expression();
-
-    //            let token = match self.currentext() {
-    //                Some(token) => token,
-    //                _ => return Err(
-    //                    Error::new(
-    //                        ErrorKind::InvalidInput,
-    //                        format!("Expected a )"),
-    //                    ),
-    //                ),
-    //            };
-    //            match token {
-    //                Token::RPAREN => (),
-    //                _ => return Err(
-    //                    Error::new(
-    //                        ErrorKind::InvalidInput,
-    //                        format!("Expected a )"),
-    //                    ),
-    //                ),
-    //            }
-
-    //            e
-    //        },
-    //        _ => return Err(
-    //            Error::new(
-    //                ErrorKind::InvalidInput,
-    //                format!("Expected a term"),
-    //            ),
-    //        ),
-    //    }
-    //}
-//}
-
-
-//pub fn parse(tokens: &Tokens) -> Result<AST, String> {
-//    //Parser::new(tokens).parse()
-//    Ok(())
-//}
 
 
 #[cfg(test)]

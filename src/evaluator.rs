@@ -1,4 +1,4 @@
-use super::parser::AST;
+use super::ast::AST;
 
 pub fn evaluate(ast: AST) {
     println!("Evaluating...");
@@ -10,6 +10,5 @@ mod tests {
 
     #[test]
     fn test_evaluate() {
-        evaluate(());
     }
 }

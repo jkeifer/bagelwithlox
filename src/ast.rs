@@ -1,6 +1,7 @@
 use std::fmt;
 
 
+#[derive(Debug)]
 pub enum Operator {
     Sub,
     Add,
@@ -73,6 +74,7 @@ impl Operator {
 }
 
 
+#[derive(Debug)]
 pub enum Expr<'a> {
     Numb{ value: f64 },
     Str{ value: &'a str },
@@ -107,23 +109,18 @@ impl<'a> fmt::Display for Expr<'a> {
     }
 }
 
-pub type AST<'a> = Expr<'a>;
 
-//        match token.token_type {
-//            TokenType::Minus
-//            TokenType::Plus
-//            TokenType::Star
-//            TokenType::Slash
-//            TokenType::BangEqual
-//            TokenType::Equal
-//            TokenType::EqualEqual
-//            TokenType::Greater
-//            TokenType::GreaterEqual
-//            TokenType::Less
-//            TokenType::LessEqual
-//            TokenType::And
-//            TokenType::Or
-//            TokenType::Bang
+#[derive(Debug)]
+pub struct AST<'a> {
+    top : Expr<'a>
+}
+
+impl<'a> AST<'a> {
+    pub fn new(top: Expr<'a>) -> AST<'a> {
+        AST { top }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
