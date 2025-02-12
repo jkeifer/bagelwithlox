@@ -1,7 +1,7 @@
 use std::fmt;
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operator {
     Sub,
     Add,
@@ -112,7 +112,7 @@ impl<'a> fmt::Display for Expr<'a> {
 
 #[derive(Debug, PartialEq)]
 pub struct AST<'a> {
-    top : Expr<'a>
+    pub top : Expr<'a>
 }
 
 impl<'a> AST<'a> {

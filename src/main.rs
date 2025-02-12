@@ -56,7 +56,7 @@ fn read_stdin_line(input: &mut String) -> Result<(), Error> {
 }
 
 
-fn repl(interpreter: &Interpreter) -> Result<(), String> {
+fn repl(interpreter: &mut Interpreter) -> Result<(), String> {
     eprintln!("Running the repl!");
     let mut input = String::new();
 
@@ -70,10 +70,11 @@ fn repl(interpreter: &Interpreter) -> Result<(), String> {
             return Ok(());
         }
 
-        if let Err(e) = interpreter.interpret(
+        match interpreter.interpret(
             &mut Source::from_string(input.to_string()),
-            ) {
-            eprintln!("{}", e);
+        ) {
+            Ok(result) => println!("{}", result),
+            Err(e) => eprintln!("{}", e),
         }
     }
 }
@@ -81,7 +82,7 @@ fn repl(interpreter: &Interpreter) -> Result<(), String> {
 
 fn main() {
     let cli = Cli::parse();
-    let interpreter =  Interpreter::new();
+    let mut interpreter =  Interpreter::new();
 
     if let Some(src) = cli.get_source() {
         match src {
@@ -94,7 +95,7 @@ fn main() {
             Err(e) => eprintln!("ERROR: {}", e),
         }
     } else {
-        match repl(&interpreter) {
+        match repl(&mut interpreter) {
             Err(e) => eprintln!("ERROR: {}", e),
             _ => (),
         }

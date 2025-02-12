@@ -5,22 +5,21 @@ use super::evaluator::evaluate;
 use super::tokenizer::tokenize;
 
 pub struct Interpreter {
-    environment: Environment,
+    env: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter{
-            environment: Environment::new(),
+            env: Environment::new(),
         }
     }
 
-    pub fn interpret(&self, src: &mut Source) -> Result<(), String> {
+    pub fn interpret(&mut self, src: &mut Source) -> Result<String, String> {
         let tokens = tokenize(src)?;
         dbg!(&tokens);
         let ast = parse(&tokens)?;
-        evaluate(ast);
-        Ok(())
+        evaluate(ast, &mut self.env)
     }
 }
 

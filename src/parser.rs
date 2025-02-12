@@ -8,8 +8,9 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, String> {
 
     let expr = expression(&mut token_iter)?;
 
-    if let Some(_) = token_iter.peek() {
-        return Err(String::from("Failed to parse all tokens"));
+    match token_iter.peek() {
+        None | Some(Token::Eof{ pos: _ }) => (),
+        _ => { return Err(String::from("Failed to parse all tokens")); },
     }
 
     Ok(AST::new(expr ))
@@ -260,6 +261,7 @@ mod tests {
             Token::Plus{ pos: FilePosition::new(1, 9) },
             Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
             Token::RightParen { pos: FilePosition::new(1, 9) },
+            Token::Eof { pos: FilePosition::new(12, 1) },
         ];
 
         let ast = parse(&tokens).unwrap();
