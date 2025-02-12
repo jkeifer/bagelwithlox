@@ -94,6 +94,7 @@ where
         Some(Token::Star{ pos: _ }) => Some(Operator::Mul),
         _ => None,
     } {
+        token_iter.next();
         Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(unary(token_iter)?) })
     } else {
         Ok(expr)
@@ -105,7 +106,7 @@ fn unary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
-    if let Some(op) = match token_iter.peek().cloned() {
+    if let Some(op) = match token_iter.peek() {
         Some(Token::Bang{ pos: _ }) => Some(Operator::Not),
         Some(Token::Minus{ pos: _ }) => Some(Operator::Negate),
         _ => None,
@@ -134,7 +135,7 @@ where
         return Ok(expr);
     }
 
-   group(token_iter)
+    group(token_iter)
 }
 
 
@@ -146,12 +147,14 @@ where
         Some(Token::LeftParen { pos: _ }) => {
             token_iter.next();
         },
-        _ => { return Err(String::from("Failed to parse")); },
+        other => {
+            return Err(format!("Failed to parse: {:#?}", other));
+        },
     }
 
     let expr = expression(token_iter)?;
     match token_iter.peek() {
-        Some(Token::RightParen { pos: _ }) => (),
+        Some(Token::RightParen { pos: _ }) => { token_iter.next(); },
         _ => { return Err(String::from("Expect ')' after expression")); },
     }
 
@@ -162,8 +165,124 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::tokenizer::FilePosition;
+    use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_parse() {
+    fn test_add() {
+        let tokens = vec![
+            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
+            Token::Plus{ pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+        ];
+
+        let ast = parse(&tokens).unwrap();
+
+        assert_eq!(
+            ast,
+            AST::new(
+                Expr::BinOp {
+                    op: Operator::Add,
+                    left: Box::new(Expr::Numb { value: 11.12 }),
+                    right: Box::new(Expr::Numb { value: 12.0 }),
+                },
+            ),
+        );
+    }
+
+    #[test]
+    fn test_precidence_mul_over_add_1() {
+        let tokens = vec![
+            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
+            Token::Plus{ pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::Star{ pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+        ];
+
+        let ast = parse(&tokens).unwrap();
+
+        assert_eq!(
+            ast,
+            AST::new(
+                Expr::BinOp {
+                    op: Operator::Add,
+                    left: Box::new(Expr::Numb { value: 11.12 }),
+                    right: Box::new(
+                        Expr::BinOp {
+                            op: Operator::Mul,
+                            left: Box::new(Expr::Numb { value: 12.0 }),
+                            right: Box::new(Expr::Numb { value: 3.0 }),
+                        },
+                    ),
+                },
+            ),
+        );
+    }
+
+    #[test]
+    fn test_precidence_mul_over_add_2() {
+        let tokens = vec![
+            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
+            Token::Star{ pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::Plus{ pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+        ];
+
+        let ast = parse(&tokens).unwrap();
+
+        assert_eq!(
+            ast,
+            AST::new(
+                Expr::BinOp {
+                    op: Operator::Add,
+                    left: Box::new(
+                        Expr::BinOp {
+                            op: Operator::Mul,
+                            left: Box::new(Expr::Numb { value: 11.12 }),
+                            right: Box::new(Expr::Numb { value: 12.0 }),
+                        },
+                    ),
+                    right: Box::new(Expr::Numb { value: 3.0 }),
+                },
+            ),
+        );
+    }
+
+    #[test]
+    fn test_grouping() {
+        let tokens = vec![
+            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
+            Token::Star{ pos: FilePosition::new(1, 9) },
+            Token::LeftParen { pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::Plus{ pos: FilePosition::new(1, 9) },
+            Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::RightParen { pos: FilePosition::new(1, 9) },
+        ];
+
+        let ast = parse(&tokens).unwrap();
+
+        assert_eq!(
+            ast,
+            AST::new(
+                Expr::BinOp {
+                    op: Operator::Mul,
+                    left: Box::new(Expr::Numb { value: 11.12 }),
+                    right: Box::new(
+                        Expr::Group{
+                            expr: Box::new(
+                                Expr::BinOp {
+                                    op: Operator::Add,
+                                    left: Box::new(Expr::Numb { value: 12.0 }),
+                                    right: Box::new(Expr::Numb { value: 3.0 }),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        );
     }
 }
