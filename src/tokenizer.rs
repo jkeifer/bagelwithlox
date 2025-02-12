@@ -131,36 +131,24 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
             '+' => Token::Plus{ pos },
             ';' => Token::SemiColon{ pos },
             '*' => Token::Star{ pos },
-            '!' => {
-                if let Some(_) = ch_idxs.next_if_eq('=') {
-                    Token::BangEqual{ pos }
-                } else {
-                    Token::Bang{ pos }
-                }
+            '!' => match ch_idxs.next_if_eq('=') {
+                Some(_) => Token::BangEqual{ pos },
+                None => Token::Bang{ pos },
             },
-            '=' => {
-                if let Some(_) = ch_idxs.next_if_eq('=') {
-                    Token::EqualEqual{ pos }
-                } else {
-                    Token::Equal{ pos }
-                }
+            '=' => match ch_idxs.next_if_eq('=') {
+                Some(_) => Token::EqualEqual{ pos },
+                None => Token::Equal{ pos },
             },
-            '>' => {
-                if let Some(_) = ch_idxs.next_if_eq('=') {
-                    Token::GreaterEqual{ pos }
-                } else {
-                    Token::Greater{ pos }
-                }
+            '>' => match ch_idxs.next_if_eq('=') {
+                Some(_) => Token::GreaterEqual{ pos },
+                None => Token::Greater{ pos },
             },
-            '<' => {
-                if let Some(_) = ch_idxs.next_if_eq('=') {
-                    Token::LessEqual{ pos }
-                } else {
-                    Token::Less{ pos }
-                }
+            '<' => match ch_idxs.next_if_eq('=') {
+                Some(_) => Token::LessEqual{ pos },
+                None => Token::Less{ pos },
             },
-            '/' => {
-                if let Some(_) = ch_idxs.next_if_eq('/') {
+            '/' => match ch_idxs.next_if_eq('/') {
+                Some(_) => {
                     // we have a comment, and we'll consume
                     // all content to the end of the line
                     let mut end = start;
@@ -168,9 +156,8 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
                         end = ch_idxs.next_index().unwrap_or(_end);
                     };
                     Token::Comment{ pos, lexeme: &src.content[start..=end] }
-                } else {
-                    Token::Slash{ pos }
-                }
+                },
+                None =>Token::Slash{ pos },
             },
 
             // String
@@ -178,16 +165,19 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
                 let end: usize;
 
                 while let Some(_) = ch_idxs.next_if_not_eq('"') {}
-                if let Some((_end, _)) = ch_idxs.next() {
-                    // we know next is a "
-                    end = _end;
-                } else {
-                    // we got to the end without a "
-                    return Err(format!(
-                        "Unterminated string literal: line {}, pos {}",
-                        pos.lineno,
-                        pos.linepos,
-                    ));
+                match ch_idxs.next() {
+                    Some((_end, _)) => {
+                        // we know next is a "
+                        end = _end;
+                    },
+                    None => {
+                        // we got to the end without a "
+                        return Err(format!(
+                            "Unterminated string literal: line {}, pos {}",
+                            pos.lineno,
+                            pos.linepos,
+                        ));
+                    }
                 }
 
                 Token::Str{
