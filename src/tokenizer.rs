@@ -1,7 +1,8 @@
 use super::source::Source;
-pub use crate::tokenizer::token_iter::{FilePosition, TokenIter};
 
 mod token_iter;
+pub use self::token_iter::{FilePosition, TokenIter};
+
 
 #[derive(Debug, PartialEq)]
 pub enum Token<'a> {
