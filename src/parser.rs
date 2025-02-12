@@ -1,171 +1,157 @@
-use crate::ast::Operator;
-
-use super::ast::{AST, Expr};
+use std::iter::Peekable;
+use super::ast::{AST, Expr, Operator};
 use super::tokenizer::{Tokens, Token};
 
 
 //pub type AST = ();
 
 
-struct Parser<'a> {
-    tokens: &'a Tokens<'a>,
-    current: usize,
+pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, String> {
+    let mut token_iter = tokens.iter().peekable();
+
+    let expr = expression(&mut token_iter)?;
+
+    if let Some(_) = token_iter.peek() {
+        return Err(String::from("Failed to parse all tokens"));
+    }
+
+    Ok(expr)
 }
 
-impl<'a> Parser<'a> {
-    fn new (tokens: &'a Tokens) -> Parser<'a> {
-        Parser {
-          tokens,
-          current: 0,
-        }
-    }
+fn expression<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    equality(token_iter)
+}
 
-    //fn next(&mut self) -> Option<&Token> {
-    //    let token = self.tokens.get(self.current);
-    //    self.current += 1;
-    //    token
-    //}
+fn equality<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let expr = comparison(token_iter)?;
 
-    fn peek(&mut self) -> &Token {
-        self.tokens.get(self.current).unwrap()
-    }
-
-    fn previous(&mut self) -> &Token {
-        self.tokens.get(self.current - 1).unwrap()
-    }
-
-    fn advance(&mut self) -> &Token {
-        if !self.is_at_end() { self.current += 1 };
-        self.previous()
-    }
-
-    fn is_at_end(&mut self) -> bool {
-        match self.peek() {
-            Token::Eof{ pos: _ } => true,
-            _ => false,
-        }
-    }
-
-    fn parse(&mut self) -> Result<AST, String> {
-        let expr = self.expression()?;
-
-        if self.current < self.tokens.len() {
-            return Err("Failed to parse all tokens".to_string());
-        }
-
+    if let Some(op) = match token_iter.peek() {
+        Some(Token::BangEqual{ pos: _ }) => Some(Operator::NotEqual),
+        Some(Token::EqualEqual{ pos: _ }) => Some(Operator::Equal),
+        _ => None,
+    } {
+        token_iter.next();
+        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(comparison(token_iter)?) })
+    } else {
         Ok(expr)
     }
+}
 
-    fn expression(&mut self) -> Result<Expr, String> {
-        self.equality()
+fn comparison<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let expr = term(token_iter)?;
+
+    if let Some(op) = match token_iter.peek() {
+        Some(Token::Greater{ pos: _ }) => Some(Operator::Greater),
+        Some(Token::GreaterEqual{ pos: _ }) => Some(Operator::GreaterEqual),
+        Some(Token::Less{ pos: _ }) => Some(Operator::Less),
+        Some(Token::LessEqual{ pos: _ }) => Some(Operator::LessEqual),
+        _ => None,
+    } {
+        token_iter.next();
+        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(term(token_iter)?) })
+    } else {
+        Ok(expr)
+    }
+}
+
+fn term<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let expr = factor(token_iter)?;
+
+    if let Some(op) = match token_iter.peek() {
+        Some(Token::Minus{ pos: _ }) => Some(Operator::Sub),
+        Some(Token::Plus{ pos: _ }) => Some(Operator::Add),
+        _ => None,
+    } {
+        token_iter.next();
+        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(factor(token_iter)?) })
+    } else {
+        Ok(expr)
+    }
+}
+
+fn factor<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let expr = unary(token_iter)?;
+
+    if let Some(op) = match token_iter.peek() {
+        Some(Token::Slash{ pos: _ }) => Some(Operator::Div),
+        Some(Token::Star{ pos: _ }) => Some(Operator::Mul),
+        _ => None,
+    } {
+        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(unary(token_iter)?) })
+    } else {
+        Ok(expr)
+    }
+}
+
+fn unary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    if let Some(op) = match token_iter.peek().cloned() {
+        Some(Token::Bang{ pos: _ }) => Some(Operator::Not),
+        Some(Token::Minus{ pos: _ }) => Some(Operator::Negate),
+        _ => None,
+    } {
+        token_iter.next();
+        Ok(Expr::UnaryOp { op, operand: Box::new(unary(token_iter)?) })
+    } else {
+        primary(token_iter)
+    }
+}
+
+fn primary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    if let Some(expr) = match token_iter.peek() {
+        Some(Token::False { pos: _ }) => Some(Expr::Bool { value: false }),
+        Some(Token::True { pos: _ }) => Some(Expr::Bool { value: true }),
+        Some(Token::Nil{ pos: _ }) => Some(Expr::Nil),
+        Some(Token::Number { pos: _, lexeme: _, value }) => Some(Expr::Numb{ value: *value }),
+        Some(Token::Str { pos: _, lexeme: _, value }) => Some(Expr::Str { value }),
+        _ => None,
+    } {
+        token_iter.next();
+        return Ok(expr);
     }
 
-    fn equality(&mut self) -> Result<Expr, String> {
-        let expr = self.comparison()?;
+   group(token_iter)
+}
 
-        if let Some(op) = match self.peek() {
-            Token::BangEqual{ pos: _ } => Some(Operator::NotEqual),
-            Token::EqualEqual{ pos: _ } => Some(Operator::Equal),
-            _ => None,
-        } {
-            self.advance();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(self.comparison()?) })
-        } else {
-            Ok(expr)
-        }
+fn group<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    match token_iter.peek() {
+        Some(Token::LeftParen { pos: _ }) => {
+            token_iter.next();
+        },
+        _ => { return Err(String::from("Failed to parse")); },
     }
 
-    fn comparison(&mut self) -> Result<Expr, String> {
-        let expr = self.term()?;
-
-        if let Some(op) = match self.peek() {
-            Token::Greater{ pos: _ } => Some(Operator::Greater),
-            Token::GreaterEqual{ pos: _ } => Some(Operator::GreaterEqual),
-            Token::Less{ pos: _ } => Some(Operator::Less),
-            Token::LessEqual{ pos: _ } => Some(Operator::LessEqual),
-            _ => None,
-        } {
-            self.advance();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(self.term()?) })
-        } else {
-            Ok(expr)
-        }
+    let expr = expression(token_iter)?;
+    match token_iter.peek() {
+        Some(Token::RightParen { pos: _ }) => (),
+        _ => { return Err(String::from("Expect ')' after expression")); },
     }
 
-    fn term(&mut self) -> Result<Expr, String> {
-        let expr = self.factor()?;
-
-        if let Some(op) = match self.peek() {
-            Token::Minus{ pos: _ } => Some(Operator::Sub),
-            Token::Plus{ pos: _ } => Some(Operator::Add),
-            _ => None,
-        } {
-            self.advance();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(self.factor()?) })
-        } else {
-            Ok(expr)
-        }
-    }
-
-    fn factor(&mut self) -> Result<Expr, String> {
-        let expr = self.unary()?;
-
-        if let Some(op) = match self.peek() {
-            Token::Slash{ pos: _ } => Some(Operator::Div),
-            Token::Star{ pos: _ } => Some(Operator::Mul),
-            _ => None,
-        } {
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(self.unary()?) })
-        } else {
-            Ok(expr)
-        }
-    }
-
-    fn unary(&mut self) -> Result<Expr, String> {
-        if let Some(op) = match self.peek() {
-            Token::Bang{ pos: _ } => Some(Operator::Not),
-            Token::Minus{ pos: _ } => Some(Operator::Negate),
-            _ => None,
-        } {
-            self.advance();
-            Ok(Expr::UnaryOp { op, operand: Box::new(self.unary()?) })
-        } else {
-            primary()?
-        }
-    }
-
-    fn primary(&mut self) -> Result<Expr, String> {
-        if let Some(expr) = match self.peek() {
-            Token::False { pos: _ } => Some(Expr::Bool { value: false }),
-            Token::True { pos: _ } => Some(Expr::Bool { value: true }),
-            Token::Nil{ pos: _ } => Some(Expr::Nil),
-            Token::Number { pos: _, lexeme: _, value } => Some(Expr::Numb{ value: *value }),
-            Token::Str { pos: _, lexeme: _, value } => Some(Expr::Str { value }),
-            _ => None,
-        } {
-            self.advance();
-            return Ok(expr);
-        }
-
-        self.group()
-    }
-
-    fn group(&mut self) -> Result<Expr, String> {
-        match self.peek() {
-            Token::LeftParen { pos: _ } => {
-                self.advance();
-            },
-            _ => { return Err(String::from("Failed to parse")); },
-        }
-
-        let expr = self.expression()?;
-        match self.peek() {
-            Token::RightParen { pos: _ } => (),
-            _ => { return Err(String::from("Expect ')' after expression")); },
-        }
-
-        Ok(Expr::Group { expr: Box::new(expr) })
-    }
+    Ok(Expr::Group { expr: Box::new(expr) })
+}
 
     //fn parse_expression(&mut self) -> Result<Expr, String> {
     //    let left = Box::new(self.parse_term()?);
@@ -231,13 +217,13 @@ impl<'a> Parser<'a> {
     //        ),
     //    }
     //}
-}
+//}
 
 
-pub fn parse(tokens: &Tokens) -> Result<AST, String> {
-    //Parser::new(tokens).parse()
-    Ok(())
-}
+//pub fn parse(tokens: &Tokens) -> Result<AST, String> {
+//    //Parser::new(tokens).parse()
+//    Ok(())
+//}
 
 
 #[cfg(test)]
@@ -248,5 +234,3 @@ mod tests {
     fn test_parse() {
     }
 }
-
-
