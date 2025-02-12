@@ -371,4 +371,47 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn test_mix() {
+        let tstr = "{}( ),.-+; \n*/!!=>>=<<====else death 11.12 ";
+        let source = Source::from_string(tstr.to_string());
+        let tokens = tokenize(&source).unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::LeftBrace{ pos: FilePosition::new(1, 1) },
+                Token::RightBrace{ pos: FilePosition::new(1, 2) },
+                Token::LeftParen{ pos: FilePosition::new(1, 3) },
+                Token::RightParen{ pos: FilePosition::new(1, 5) },
+                Token::Comma{ pos: FilePosition::new(1, 6) },
+                Token::Dot{ pos: FilePosition::new(1, 7) },
+                Token::Minus{ pos: FilePosition::new(1, 8) },
+                Token::Plus{ pos: FilePosition::new(1, 9) },
+                Token::SemiColon{ pos: FilePosition::new(1, 10) },
+                Token::Star{ pos: FilePosition::new(2, 1) },
+                Token::Slash{ pos: FilePosition::new(2, 2) },
+                Token::Bang{ pos: FilePosition::new(2, 3) },
+                Token::BangEqual{ pos: FilePosition::new(2, 4) },
+                Token::Greater{ pos: FilePosition::new(2, 6) },
+                Token::GreaterEqual{ pos: FilePosition::new(2, 7) },
+                Token::Less{ pos: FilePosition::new(2, 9) },
+                Token::LessEqual{ pos: FilePosition::new(2, 10) },
+                Token::EqualEqual{ pos: FilePosition::new(2, 12) },
+                Token::Equal{ pos: FilePosition::new(2, 14) },
+                Token::Else{ pos: FilePosition::new(2, 15) },
+                Token::Identifier{ lexeme:  "death", pos: FilePosition::new(2, 20) },
+                Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
+                Token::Eof{ pos: FilePosition::new(2, 32) },
+            ],
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Bad character line 1, pos 2")]
+    fn test_illegal() {
+        let tstr = " &";
+        let source = Source::from_string(tstr.to_string());
+        let _ = tokenize(&source).unwrap();
+    }
 }
