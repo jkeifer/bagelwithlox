@@ -37,10 +37,8 @@ impl LoxValue {
     fn _is_truthy(&self) -> bool {
         use LoxValue::*;
         match self {
-            Numb(v) => *v != 0.0,
-            Str(v) => v.len() > 0,
-            Bool(v) => *v,
-            Nil => false,
+            Bool(false) | Nil => false,
+            _ => true,
         }
     }
 

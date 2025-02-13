@@ -66,9 +66,9 @@ fn repl(interpreter: &mut Interpreter) -> Result<(), String> {
             _ => (),
         }
 
-        if input == "" {
-            return Ok(());
-        }
+        if input == "" { return Ok(()); }
+        if input == "\n" { continue; }
+
 
         match interpreter.interpret(
             &mut Source::from_string(input.to_string()),

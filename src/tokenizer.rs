@@ -143,7 +143,13 @@ pub enum TokenType<'a> {
 
 impl<'a> fmt::Display for TokenType<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{}", match self {
+            TokenType::Comment{..} => "Comment".to_string(),
+            TokenType::Identifier{..} => "Identifier".to_string(),
+            TokenType::Str{..} => "Str".to_string(),
+            TokenType::Number{..} => "Number".to_string(),
+            _ => format!("{:?}", self),
+        })
     }
 }
 
