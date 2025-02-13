@@ -1,188 +1,6 @@
-use std::fmt;
 use super::ast::{AST, Expr, Operator};
 use super::environment::Environment;
-
-
-#[derive(Clone, Debug, PartialEq)]
-enum LoxValue {
-    Numb(f64),
-    Str(String),
-    Bool(bool),
-    Nil,
-}
-
-impl fmt::Display for LoxValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use LoxValue::*;
-        write!(f, "{}", match self {
-            Numb(_) => "Number",
-            Str(_) => "String",
-            Bool(_) => "Bool",
-            Nil => "Nil",
-        })
-    }
-}
-
-impl LoxValue {
-    fn value_string(&self) -> String {
-        use LoxValue::*;
-        match self {
-            Numb(v) => format!("{}", v),
-            Str(v) => format!("{}", v),
-            Bool(v) => format!("{}", v),
-            Nil => String::from("nil"),
-        }
-    }
-
-    fn _is_truthy(&self) -> bool {
-        use LoxValue::*;
-        match self {
-            Bool(false) | Nil => false,
-            _ => true,
-        }
-    }
-
-    fn is_truthy(&self) -> LoxValue {
-        use LoxValue::*;
-        match self {
-            Bool(v) => Bool(*v),
-            _ => Bool(self._is_truthy()),
-        }
-    }
-
-    fn not(&self) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match self {
-            Bool(v) => Ok(Bool(!v)),
-            _ => self.is_truthy().not(),
-        }
-    }
-
-    fn negate(&self) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match self {
-            Numb(v) => Ok(Numb(-v)),
-            _ => Err(format!("Cannot negate {}", self)),
-        }
-    }
-
-    fn sub(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Numb(a - b)),
-            (a, b) => Err(format!("Cannot subtract {} from {}", *a, b)),
-        }
-    }
-
-    fn add(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Numb(a + b)),
-            (Str(a), Str(b)) => Ok(Str(a.to_string() + &b)),
-            (a, b) => Err(format!("Cannot add {} from {}", a, b)),
-        }
-    }
-
-    fn mul(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Numb(a * b)),
-            (Str(a), Numb(b)) => Ok(Str(a.repeat(*b as usize))),
-            (Numb(a), Str(b)) => Ok(Str(b.repeat(*a as usize))),
-            (a, b) => Err(format!("Cannot multiply {} from {}", a, b)),
-        }
-    }
-
-    fn div(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Numb(a / b)),
-            (a, b) => Err(format!("Cannot divide {} from {}", a, b)),
-        }
-    }
-
-    fn neq(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Bool(a != b)),
-            (Str(a), Str(b)) => Ok(Bool(a != b)),
-            (Bool(a), Bool(b)) => Ok(Bool(a != b)),
-            _ => Ok(Bool(true)),
-        }
-    }
-
-    fn eq(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Bool(a == b)),
-            (Str(a), Str(b)) => Ok(Bool(a == b)),
-            (Bool(a), Bool(b)) => Ok(Bool(a == b)),
-            _ => Ok(Bool(false)),
-        }
-    }
-
-    fn gt(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Bool(a > b)),
-            (Str(a), Str(b)) => Ok(Bool(a > b)),
-            (Bool(a), Bool(b)) => Ok(Bool(a > b)),
-            _ => Ok(Bool(false)),
-        }
-    }
-
-    fn ge(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Bool(a >= b)),
-            (Str(a), Str(b)) => Ok(Bool(a >= b)),
-            (Bool(a), Bool(b)) => Ok(Bool(a >= b)),
-            _ => Ok(Bool(false)),
-        }
-    }
-
-    fn lt(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Bool(a < b)),
-            (Str(a), Str(b)) => Ok(Bool(a < b)),
-            (Bool(a), Bool(b)) => Ok(Bool(a < b)),
-            _ => Ok(Bool(false)),
-        }
-    }
-
-    fn le(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        match (self, b) {
-            (Numb(a), Numb(b)) => Ok(Bool(a <= b)),
-            (Str(a), Str(b)) => Ok(Bool(a <= b)),
-            (Bool(a), Bool(b)) => Ok(Bool(a <= b)),
-            _ => Ok(Bool(false)),
-        }
-    }
-
-    fn and(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        Ok(Bool(match self {
-            Bool(v) => *v,
-            _ => self._is_truthy(),
-        } && match self {
-            Bool(v) => *v,
-            _ => b._is_truthy(),
-        }))
-    }
-
-    fn or(&self, b: &LoxValue) -> Result<LoxValue, String> {
-        use LoxValue::*;
-        Ok(Bool(match self {
-            Bool(v) => *v,
-            _ => self._is_truthy(),
-        } || match self {
-            Bool(v) => *v,
-            _ => b._is_truthy(),
-        }))
-    }
-}
+use super::value::LoxValue;
 
 
 fn eval_bin_op(
@@ -229,12 +47,14 @@ fn eval_unary_op(
 
 
 fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
+    use Expr::*;
+    use LoxValue::*;
     match expr {
-        Expr::Numb { value } => Ok(LoxValue::Numb(*value)),
-        Expr::Str { value } => Ok(LoxValue::Str(value.to_string())),
-        Expr::Bool { value } => Ok(LoxValue::Bool(*value)),
-        Expr::Nil => Ok(LoxValue::Nil),
-        Expr::BinOp { op, left, right } => {
+        Numb { value } => Ok(VNumb(*value)),
+        Str { value } => Ok(VStr(value.to_string())),
+        Bool { value } => Ok(VBool(*value)),
+        Nil => Ok(VNil),
+        BinOp { op, left, right } => {
             eval_bin_op(
                 &op,
                 &eval(left.as_ref(), env)?,
@@ -242,13 +62,13 @@ fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
                 env,
             )
         },
-        Expr::UnaryOp { op, operand } => {
+        UnaryOp { op, operand } => {
             eval_unary_op(
                 &op,
                 &eval(operand.as_ref(), env)?,
             )
         },
-        Expr::Group { expr } => eval(expr.as_ref(), env),
+        Group { expr } => eval(expr.as_ref(), env),
     }
 }
 
@@ -279,42 +99,42 @@ mod tests {
 
     #[test]
     fn literals() {
-        assert_eq!(run_expr("2"), Numb(2.0));
-        assert_eq!(run_expr("true"), Bool(true));
-        assert_eq!(run_expr("false"), Bool(false));
-        assert_eq!(run_expr("nil"), Nil);
-        assert_eq!(run_expr("\"hello\""), Str(String::from("hello")));
+        assert_eq!(run_expr("2"), VNumb(2.0));
+        assert_eq!(run_expr("true"), VBool(true));
+        assert_eq!(run_expr("false"), VBool(false));
+        assert_eq!(run_expr("nil"), VNil);
+        assert_eq!(run_expr("\"hello\""), VStr(String::from("hello")));
     }
 
     #[test]
     fn binops() {
-        assert_eq!(run_expr("2+3"), Numb(5.0));
-        assert_eq!(run_expr("2*3"), Numb(6.0));
-        assert_eq!(run_expr("2-3"), Numb(-1.0));
-        assert_eq!(run_expr("3/2"), Numb(1.5));
-        assert_eq!(run_expr("\"hello\"+\"world\""), Str(String::from("helloworld")));
+        assert_eq!(run_expr("2+3"), VNumb(5.0));
+        assert_eq!(run_expr("2*3"), VNumb(6.0));
+        assert_eq!(run_expr("2-3"), VNumb(-1.0));
+        assert_eq!(run_expr("3/2"), VNumb(1.5));
+        assert_eq!(run_expr("\"hello\"+\"world\""), VStr(String::from("helloworld")));
     }
 
     #[test]
     fn compare() {
-        assert_eq!(run_expr("2<3"), Bool(true));
-        assert_eq!(run_expr("3<=3"), Bool(true));
-        assert_eq!(run_expr("2>3"), Bool(false));
-        assert_eq!(run_expr("3>=3"), Bool(true));
-        assert_eq!(run_expr("3==3"), Bool(true));
-        assert_eq!(run_expr("3!=3"), Bool(false));
-        assert_eq!(run_expr("\"x\" == \"x\""), Bool(true));
+        assert_eq!(run_expr("2<3"), VBool(true));
+        assert_eq!(run_expr("3<=3"), VBool(true));
+        assert_eq!(run_expr("2>3"), VBool(false));
+        assert_eq!(run_expr("3>=3"), VBool(true));
+        assert_eq!(run_expr("3==3"), VBool(true));
+        assert_eq!(run_expr("3!=3"), VBool(false));
+        assert_eq!(run_expr("\"x\" == \"x\""), VBool(true));
     }
 
     #[test]
     fn group() {
-        assert_eq!(run_expr("2 + (3*4)"), Numb(14.0));
+        assert_eq!(run_expr("2 + (3*4)"), VNumb(14.0));
     }
 
     #[test]
     fn unary() {
-        assert_eq!(run_expr("-3 + 4"), Numb(1.0));
-        assert_eq!(run_expr("!true"), Bool(false));
-        assert_eq!(run_expr("!123"), Bool(false));
+        assert_eq!(run_expr("-3 + 4"), VNumb(1.0));
+        assert_eq!(run_expr("!true"), VBool(false));
+        assert_eq!(run_expr("!123"), VBool(false));
     }
 }
