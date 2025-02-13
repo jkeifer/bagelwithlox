@@ -1,29 +1,7 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
+use crate::source::FilePosition;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FilePosition {
-    pub lineno: usize,
-    pub linepos: usize,
-}
-
-impl FilePosition {
-    pub fn new(lineno: usize, linepos: usize) -> FilePosition {
-        FilePosition {
-            lineno,
-            linepos,
-        }
-    }
-
-    fn char_inc(&mut self, ch: char) {
-        if ch == '\n' {
-            self.lineno += 1;
-            self.linepos = 0;
-        } else {
-            self.linepos += 1;
-        }
-    }
-}
 
 pub struct TokenIter<'a> {
     peekable: Peekable<CharIndices<'a>>,
@@ -83,4 +61,3 @@ impl<'a> TokenIter<'a> {
         }
     }
 }
-

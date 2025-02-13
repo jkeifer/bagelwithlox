@@ -24,6 +24,16 @@ impl fmt::Display for LoxValue {
 }
 
 impl LoxValue {
+    fn value_string(&self) -> String {
+        use LoxValue::*;
+        match self {
+            Numb(v) => format!("{}", v),
+            Str(v) => format!("{}", v),
+            Bool(v) => format!("{}", v),
+            Nil => String::from("nil"),
+        }
+    }
+
     fn _is_truthy(&self) -> bool {
         use LoxValue::*;
         match self {
@@ -247,7 +257,7 @@ fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
 
 pub fn evaluate(ast: AST, env: &mut Environment) -> Result<String, String> {
     match eval(&ast.top, env) {
-        Ok(val) => Ok(format!("{}", val)),
+        Ok(val) => Ok(format!("{}", val.value_string())),
         Err(e) => Err(e),
     }
 }

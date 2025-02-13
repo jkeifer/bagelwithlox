@@ -1,83 +1,149 @@
-use super::source::Source;
+use std::fmt;
+use crate::source::{
+    FilePosition,
+    Source,
+    SourceError,
+};
 
 mod token_iter;
-pub use self::token_iter::{FilePosition, TokenIter};
+pub use self::token_iter::TokenIter;
+
+
+const TOKENIZE_ERROR: &'static str = "TokenizeError";
+
+
+#[derive(Debug)]
+pub struct TokenizeError {
+    pos: Option<FilePosition>,
+    msg: String,
+}
+
+impl SourceError for TokenizeError {
+    fn get_message(&self) -> &str {
+        &self.msg
+    }
+
+    fn get_position(&self) -> Option<FilePosition> {
+        self.pos
+    }
+
+    fn get_type(&self) -> &str {
+        &TOKENIZE_ERROR
+    }
+}
+
+impl TokenizeError {
+    fn new(pos: FilePosition, msg: String) -> TokenizeError {
+        TokenizeError {
+            pos: Some(pos),
+            msg,
+        }
+    }
+}
 
 
 #[derive(Debug, PartialEq)]
-pub enum Token<'a> {
-    // Single-character tokens.
-    LeftParen{ pos: FilePosition },
-    RightParen{ pos: FilePosition },
-    LeftBrace{ pos: FilePosition },
-    RightBrace{ pos: FilePosition },
-    Comma{ pos: FilePosition },
-    Dot{ pos: FilePosition },
-    Minus{ pos: FilePosition },
-    Plus{ pos: FilePosition },
-    SemiColon{ pos: FilePosition },
-    Star{ pos: FilePosition },
-
-    // One Or Two Character Tokens.
-    Bang{ pos: FilePosition },
-    BangEqual{ pos: FilePosition },
-    Equal{ pos: FilePosition },
-    EqualEqual{ pos: FilePosition },
-    Greater{ pos: FilePosition },
-    GreaterEqual{ pos: FilePosition },
-    Less{ pos: FilePosition },
-    LessEqual{ pos: FilePosition },
-    Slash{ pos: FilePosition },
-    Comment{ pos: FilePosition, lexeme: &'a str },
-
-    // Literals.
-    Identifier{ pos: FilePosition, lexeme: &'a str },
-    Str{ pos: FilePosition, lexeme: &'a str, value: &'a str },
-    Number{ pos: FilePosition, lexeme: &'a str, value: f64 },
-
-    // Keywords.
-    And{ pos: FilePosition },
-    Class{ pos: FilePosition },
-    Else{ pos: FilePosition },
-    False{ pos: FilePosition },
-    Fun{ pos: FilePosition },
-    For{ pos: FilePosition },
-    If{ pos: FilePosition },
-    Nil{ pos: FilePosition },
-    Or{ pos: FilePosition },
-    Print{ pos: FilePosition },
-    Return{ pos: FilePosition },
-    Super{ pos: FilePosition },
-    This{ pos: FilePosition },
-    True{ pos: FilePosition },
-    Var{ pos: FilePosition },
-    While{ pos: FilePosition },
-
-    Eof{ pos: FilePosition },
+pub struct Token<'a> {
+    typ: TokenType<'a>,
+    pos: FilePosition,
 }
 
 impl<'a> Token<'a> {
-    fn match_identifier_token(pos: FilePosition, id: &'a str) -> Token<'a> {
-        use Token::*;
-        match id {
-            "and" => And{ pos },
-            "class" => Class{ pos },
-            "else" => Else{ pos },
-            "false" => False{ pos },
-            "fun" => Fun{ pos },
-            "for" => For{ pos },
-            "if" => If{ pos },
-            "nil" => Nil{ pos },
-            "or" => Or{ pos },
-            "print" => Print{ pos },
-            "return" => Return{ pos },
-            "super" => Super{ pos },
-            "this" => This{ pos },
-            "true" => True{ pos },
-            "var" => Var{ pos },
-            "while" => While{ pos },
-            _ => Identifier{ pos, lexeme: id },
+    pub fn new(typ: TokenType<'a>, pos: FilePosition) -> Token<'a> {
+        Token {
+            typ,
+            pos,
         }
+    }
+
+    pub fn get_type(&self) -> &TokenType<'a> {
+        &self.typ
+    }
+
+    pub fn get_position(&self) -> FilePosition {
+        self.pos
+    }
+
+    fn match_identifier_token(pos: FilePosition, id: &'a str) -> Token<'a> {
+        use TokenType::*;
+        match id {
+            "and" => Token::new(And, pos),
+            "class" => Token::new(Class, pos),
+            "else" => Token::new(Else, pos),
+            "false" => Token::new(False, pos),
+            "fun" => Token::new(Fun, pos),
+            "for" => Token::new(For, pos),
+            "if" => Token::new(If, pos),
+            "nil" => Token::new(Nil, pos),
+            "or" => Token::new(Or, pos),
+            "print" => Token::new(Print, pos),
+            "return" => Token::new(Return, pos),
+            "super" => Token::new(Super, pos),
+            "this" => Token::new(This, pos),
+            "true" => Token::new(True, pos),
+            "var" => Token::new(Var, pos),
+            "while" => Token::new(While, pos),
+            _ => Token::new(Identifier{ lexeme: id }, pos),
+        }
+    }
+}
+
+
+#[derive(Debug, PartialEq)]
+pub enum TokenType<'a> {
+    // Single-character tokens.
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    SemiColon,
+    Star,
+
+    // One Or Two Character Tokens.
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Slash,
+    Comment{ lexeme: &'a str },
+
+    // Literals.
+    Identifier{ lexeme: &'a str },
+    Str{ lexeme: &'a str, value: &'a str },
+    Number{ lexeme: &'a str, value: f64 },
+
+    // Keywords.
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+
+    Eof,
+}
+
+impl<'a> fmt::Display for TokenType<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -110,43 +176,57 @@ fn find_number_end(token_iter: &mut TokenIter) -> usize {
     end
 }
 
-pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
-    println!("Tokenizing...");
+pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, TokenizeError> {
+    use TokenType::*;
+
     let mut ch_idxs = TokenIter::new(src.content.char_indices().peekable());
     let mut tokens = Tokens::new();
 
     while let Some((start, ch)) = ch_idxs.next() {
-        let pos = ch_idxs.filepos;
+        let mut pos = ch_idxs.filepos;
+        pos.length = 1;
         tokens.push(match ch {
             '\n' => {
                 continue;
             }
             _ if ch.is_whitespace() => continue,
-            '(' => Token::LeftParen{ pos },
-            ')' => Token::RightParen{ pos },
-            '{' => Token::LeftBrace{ pos },
-            '}' => Token::RightBrace{ pos },
-            ',' => Token::Comma{ pos },
-            '.' => Token::Dot{ pos },
-            '-' => Token::Minus{ pos },
-            '+' => Token::Plus{ pos },
-            ';' => Token::SemiColon{ pos },
-            '*' => Token::Star{ pos },
+            '(' => Token::new(LeftParen, pos),
+            ')' => Token::new(RightParen, pos),
+            '{' => Token::new(LeftBrace, pos),
+            '}' => Token::new(RightBrace, pos),
+            ',' => Token::new(Comma, pos),
+            '.' => Token::new(Dot, pos),
+            '-' => Token::new(Minus, pos),
+            '+' => Token::new(Plus, pos),
+            ';' => Token::new(SemiColon, pos),
+            '*' => Token::new(Star, pos),
             '!' => match ch_idxs.next_if_eq('=') {
-                Some(_) => Token::BangEqual{ pos },
-                None => Token::Bang{ pos },
+                Some(_) => {
+                    pos.length = 2;
+                    Token::new(BangEqual, pos)
+                },
+                None => Token::new(Bang, pos),
             },
             '=' => match ch_idxs.next_if_eq('=') {
-                Some(_) => Token::EqualEqual{ pos },
-                None => Token::Equal{ pos },
+                Some(_) => {
+                    pos.length = 2;
+                    Token::new(EqualEqual, pos)
+                },
+                None => Token::new(Equal, pos),
             },
             '>' => match ch_idxs.next_if_eq('=') {
-                Some(_) => Token::GreaterEqual{ pos },
-                None => Token::Greater{ pos },
+                Some(_) => {
+                    pos.length = 2;
+                    Token::new(GreaterEqual, pos)
+                },
+                None => Token::new(Greater, pos),
             },
             '<' => match ch_idxs.next_if_eq('=') {
-                Some(_) => Token::LessEqual{ pos },
-                None => Token::Less{ pos },
+                Some(_) => {
+                    pos.length = 2;
+                    Token::new(LessEqual, pos)
+                },
+                None => Token::new(Less, pos),
             },
             '/' => match ch_idxs.next_if_eq('/') {
                 Some(_) => {
@@ -156,9 +236,10 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
                     while let Some((_end, _)) = ch_idxs.next_if_not_eq('\n') {
                         end = ch_idxs.next_index().unwrap_or(_end);
                     };
-                    Token::Comment{ pos, lexeme: &src.content[start..=end] }
+                    pos.length += end - start;
+                    Token::new(Comment{ lexeme: &src.content[start..=end] }, pos)
                 },
-                None =>Token::Slash{ pos },
+                None =>Token::new(Slash, pos),
             },
 
             // String
@@ -173,41 +254,45 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
                     },
                     None => {
                         // we got to the end without a "
-                        return Err(format!(
-                            "Unterminated string literal: line {}, pos {}",
-                            pos.lineno,
-                            pos.linepos,
+                        return Err(TokenizeError::new(
+                            pos,
+                            "unterminated string literal".to_string(),
                         ));
-                    }
+                    },
                 }
 
-                Token::Str{
+                Token::new(
+                    Str {
+                        lexeme: &src.content[start..=end],
+                        value: &src.content[start+1..=end-1],
+                    },
                     pos,
-                    lexeme: &src.content[start..=end],
-                    value: &src.content[start+1..=end-1],
-                }
+                )
             },
 
             // Number
             _ if ch.is_digit(10) => {
                 let end = start + find_number_end(&mut ch_idxs);
                 let lexeme = &src.content[start..=end];
+                pos.length += end - start;
+
                 let value = match lexeme.parse() {
                     Ok(val) => val,
-                    Err(e) => return Err(format!(
-                        "Invalid numeric literal line {}, pos {}.\nInput value {}. Error: {}",
-                        pos.lineno,
-                        pos.linepos,
-                        lexeme,
-                        e,
-                    )),
+                    Err(e) => {
+                        return Err(TokenizeError::new(
+                            pos,
+                            format!("invalid numeric literal: {}", e),
+                        ));
+                    },
                 };
 
-                Token::Number{
+                Token::new(
+                    Number{
+                        lexeme,
+                        value,
+                    },
                     pos,
-                    lexeme,
-                    value,
-                }
+                )
             },
 
             // Identifier or keyword
@@ -221,17 +306,16 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
                 }
 
                 let lexeme = &src.content[start..end];
+                pos.length = end - start;
                 Token::match_identifier_token(pos, lexeme)
             },
 
             // Invalid char
             other => {
                 let pos = ch_idxs.filepos;
-                return Err(format!(
-                    "Bad character line {}, pos {}: {}",
-                    pos.lineno,
-                    pos.linepos,
-                    other,
+                return Err(TokenizeError::new(
+                    pos,
+                    format!("bad character: {}", other),
                 ));
             },
         });
@@ -240,7 +324,7 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
 
     let mut pos = ch_idxs.filepos;
     pos.linepos += 1;
-    tokens.push(Token::Eof{ pos });
+    tokens.push(Token::new(Eof, pos));
 
     Ok(tokens)
 }
@@ -250,6 +334,7 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, String> {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use TokenType::*;
 
     #[test]
     fn test_symbols() {
@@ -259,22 +344,22 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::LeftParen{ pos: FilePosition::new(1, 1) },
-                Token::RightParen{ pos: FilePosition::new(1, 3) },
-                Token::LeftBrace{ pos: FilePosition::new(1, 5) },
-                Token::RightBrace{ pos: FilePosition::new(1, 7) },
-                Token::Comma{ pos: FilePosition::new(1, 9) },
-                Token::Dot{ pos: FilePosition::new(1, 11) },
-                Token::Plus{ pos: FilePosition::new(1, 13) },
-                Token::Minus{ pos: FilePosition::new(1, 15) },
-                Token::SemiColon{ pos: FilePosition::new(1, 17) },
-                Token::Star{ pos: FilePosition::new(1, 19) },
-                Token::Slash{ pos: FilePosition::new(1, 21) },
-                Token::Bang{ pos: FilePosition::new(1, 23) },
-                Token::Equal{ pos: FilePosition::new(1, 25) },
-                Token::Less{ pos: FilePosition::new(1, 27) },
-                Token::Greater{ pos: FilePosition::new(1, 29) },
-                Token::Eof{ pos: FilePosition::new(1, 30) },
+                Token::new(LeftParen, FilePosition::nwl(1, 1, 1)),
+                Token::new(RightParen, FilePosition::nwl(1, 3, 1)),
+                Token::new(LeftBrace, FilePosition::nwl(1, 5, 1)),
+                Token::new(RightBrace, FilePosition::nwl(1, 7, 1)),
+                Token::new(Comma, FilePosition::nwl(1, 9, 1)),
+                Token::new(Dot, FilePosition::nwl(1, 11, 1)),
+                Token::new(Plus, FilePosition::nwl(1, 13, 1)),
+                Token::new(Minus, FilePosition::nwl(1, 15, 1)),
+                Token::new(SemiColon, FilePosition::nwl(1, 17, 1)),
+                Token::new(Star, FilePosition::nwl(1, 19, 1)),
+                Token::new(Slash, FilePosition::nwl(1, 21, 1)),
+                Token::new(Bang, FilePosition::nwl(1, 23, 1)),
+                Token::new(Equal, FilePosition::nwl(1, 25, 1)),
+                Token::new(Less, FilePosition::nwl(1, 27, 1)),
+                Token::new(Greater, FilePosition::nwl(1, 29, 1)),
+                Token::new(Eof, FilePosition::nwl(1, 30, 0)),
            ],
         );
     }
@@ -287,11 +372,11 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::BangEqual{ pos: FilePosition::new(1, 1) },
-                Token::EqualEqual{ pos: FilePosition::new(1, 4) },
-                Token::LessEqual{ pos: FilePosition::new(1, 7) },
-                Token::GreaterEqual{ pos: FilePosition::new(1, 10) },
-                Token::Eof{ pos: FilePosition::new(1, 12) },
+                Token::new(BangEqual, FilePosition::nwl(1, 1, 2)),
+                Token::new(EqualEqual, FilePosition::nwl(1, 4, 2)),
+                Token::new(LessEqual, FilePosition::nwl(1, 7, 2)),
+                Token::new(GreaterEqual, FilePosition::nwl(1, 10, 2)),
+                Token::new(Eof, FilePosition::nwl(1, 12, 0)),
             ],
         );
     }
@@ -304,10 +389,10 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::Identifier{ pos: FilePosition::new(1, 1), lexeme: "abc"},
-                Token::Identifier{ pos: FilePosition::new(1, 5), lexeme: "abc123" },
-                Token::Identifier{ pos: FilePosition::new(1, 12), lexeme: "_x_3_4_" },
-                Token::Eof{ pos: FilePosition::new(2, 1) },
+                Token::new(Identifier { lexeme: "abc" }, FilePosition::nwl(1, 1, 3)),
+                Token::new(Identifier { lexeme: "abc123" }, FilePosition::nwl(1, 5, 6)),
+                Token::new(Identifier { lexeme: "_x_3_4_"}, FilePosition::nwl(1, 12, 7)),
+                Token::new(Eof, FilePosition::nwl(2, 1, 0)),
             ],
         );
     }
@@ -320,23 +405,23 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::And{ pos: FilePosition::new(1, 1) },
-                Token::Class{ pos: FilePosition::new(1, 5) },
-                Token::Else{ pos: FilePosition::new(1, 11) },
-                Token::False{ pos: FilePosition::new(1, 16) },
-                Token::For{ pos: FilePosition::new(1, 22) },
-                Token::Fun{ pos: FilePosition::new(1, 26) },
-                Token::If{ pos: FilePosition::new(1, 30) },
-                Token::Nil{ pos: FilePosition::new(1, 33) },
-                Token::Or{ pos: FilePosition::new(1, 37) },
-                Token::Print{ pos: FilePosition::new(1, 40) },
-                Token::Return{ pos: FilePosition::new(1, 46) },
-                Token::Super{ pos: FilePosition::new(1, 53) },
-                Token::This{ pos: FilePosition::new(1, 59) },
-                Token::True{ pos: FilePosition::new(1, 64) },
-                Token::Var{ pos: FilePosition::new(1, 69) },
-                Token::While{ pos: FilePosition::new(1, 73) },
-                Token::Eof{ pos: FilePosition::new(1, 78) },
+                Token::new(And, FilePosition::nwl(1, 1, 3)),
+                Token::new(Class, FilePosition::nwl(1, 5, 5)),
+                Token::new(Else, FilePosition::nwl(1, 11, 4)),
+                Token::new(False, FilePosition::nwl(1, 16, 5)),
+                Token::new(For, FilePosition::nwl(1, 22, 3)),
+                Token::new(Fun, FilePosition::nwl(1, 26, 3)),
+                Token::new(If, FilePosition::nwl(1, 30, 2)),
+                Token::new(Nil, FilePosition::nwl(1, 33, 3)),
+                Token::new(Or, FilePosition::nwl(1, 37, 2)),
+                Token::new(Print, FilePosition::nwl(1, 40, 5)),
+                Token::new(Return, FilePosition::nwl(1, 46, 6)),
+                Token::new(Super, FilePosition::nwl(1, 53, 5)),
+                Token::new(This, FilePosition::nwl(1, 59, 4)),
+                Token::new(True, FilePosition::nwl(1, 64, 4)),
+                Token::new(Var, FilePosition::nwl(1, 69, 3)),
+                Token::new(While, FilePosition::nwl(1, 73, 5)),
+                Token::new(Eof, FilePosition::nwl(1, 78, 0)),
             ],
         );
     }
@@ -349,10 +434,10 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::Number{ value: 1.0, lexeme: "1", pos: FilePosition::new(1, 1) },
-                Token::Number{ value: 1234.0, lexeme: "1234", pos: FilePosition::new(1, 3) },
-                Token::Number{ value: 12.34, lexeme: "12.34", pos: FilePosition::new(1, 8) },
-                Token::Eof{ pos: FilePosition::new(1, 13) },
+                Token::new(Number{ value: 1.0, lexeme: "1" }, FilePosition::nwl(1, 1, 1)),
+                Token::new(Number{ value: 1234.0, lexeme: "1234" }, FilePosition::nwl(1, 3, 4)),
+                Token::new(Number{ value: 12.34, lexeme: "12.34" }, FilePosition::nwl(1, 8, 5)),
+                Token::new(Eof, FilePosition::nwl(1, 13, 0)),
             ],
         );
     }
@@ -365,9 +450,9 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::Str{ value: "hello", lexeme:  "\"hello\"", pos: FilePosition::new(1, 1) },
-                Token::Str{ value: "world", lexeme: "\"world\"", pos: FilePosition::new(1, 9) },
-                Token::Eof{ pos: FilePosition::new(1, 16) },
+                Token::new(Str{ value: "hello", lexeme:  "\"hello\"" }, FilePosition::nwl(1, 1, 1)),
+                Token::new(Str{ value: "world", lexeme: "\"world\"" }, FilePosition::nwl(1, 9, 1)),
+                Token::new(Eof, FilePosition::nwl(1, 16, 0)),
             ],
         );
     }
@@ -380,35 +465,35 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Token::LeftBrace{ pos: FilePosition::new(1, 1) },
-                Token::RightBrace{ pos: FilePosition::new(1, 2) },
-                Token::LeftParen{ pos: FilePosition::new(1, 3) },
-                Token::RightParen{ pos: FilePosition::new(1, 5) },
-                Token::Comma{ pos: FilePosition::new(1, 6) },
-                Token::Dot{ pos: FilePosition::new(1, 7) },
-                Token::Minus{ pos: FilePosition::new(1, 8) },
-                Token::Plus{ pos: FilePosition::new(1, 9) },
-                Token::SemiColon{ pos: FilePosition::new(1, 10) },
-                Token::Star{ pos: FilePosition::new(2, 1) },
-                Token::Slash{ pos: FilePosition::new(2, 2) },
-                Token::Bang{ pos: FilePosition::new(2, 3) },
-                Token::BangEqual{ pos: FilePosition::new(2, 4) },
-                Token::Greater{ pos: FilePosition::new(2, 6) },
-                Token::GreaterEqual{ pos: FilePosition::new(2, 7) },
-                Token::Less{ pos: FilePosition::new(2, 9) },
-                Token::LessEqual{ pos: FilePosition::new(2, 10) },
-                Token::EqualEqual{ pos: FilePosition::new(2, 12) },
-                Token::Equal{ pos: FilePosition::new(2, 14) },
-                Token::Else{ pos: FilePosition::new(2, 15) },
-                Token::Identifier{ lexeme:  "death", pos: FilePosition::new(2, 20) },
-                Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
-                Token::Eof{ pos: FilePosition::new(2, 32) },
+                Token::new(LeftBrace, FilePosition::nwl(1, 1, 1)),
+                Token::new(RightBrace, FilePosition::nwl(1, 2, 1)),
+                Token::new(LeftParen, FilePosition::nwl(1, 3, 1)),
+                Token::new(RightParen, FilePosition::nwl(1, 5, 1)),
+                Token::new(Comma, FilePosition::nwl(1, 6, 1)),
+                Token::new(Dot, FilePosition::nwl(1, 7, 1)),
+                Token::new(Minus, FilePosition::nwl(1, 8, 1)),
+                Token::new(Plus, FilePosition::nwl(1, 9, 1)),
+                Token::new(SemiColon, FilePosition::nwl(1, 10, 1)),
+                Token::new(Star, FilePosition::nwl(2, 1, 1)),
+                Token::new(Slash, FilePosition::nwl(2, 2, 1)),
+                Token::new(Bang, FilePosition::nwl(2, 3, 1)),
+                Token::new(BangEqual, FilePosition::nwl(2, 4, 2)),
+                Token::new(Greater, FilePosition::nwl(2, 6, 1)),
+                Token::new(GreaterEqual, FilePosition::nwl(2, 7, 2)),
+                Token::new(Less, FilePosition::nwl(2, 9, 1)),
+                Token::new(LessEqual, FilePosition::nwl(2, 10, 2)),
+                Token::new(EqualEqual, FilePosition::nwl(2, 12, 2)),
+                Token::new(Equal, FilePosition::nwl(2, 14, 1)),
+                Token::new(Else, FilePosition::nwl(2, 15, 4)),
+                Token::new(Identifier{ lexeme:  "death" }, FilePosition::nwl(2, 20, 5)),
+                Token::new(Number{ value: 11.12, lexeme: "11.12" }, FilePosition::nwl(2, 26, 5)),
+                Token::new(Eof, FilePosition::nwl(2, 32, 0)),
             ],
         );
     }
 
     #[test]
-    #[should_panic(expected = "Bad character line 1, pos 2")]
+    #[should_panic(expected = "bad character: &")]
     fn test_illegal() {
         let tstr = " &";
         let source = Source::from_string(tstr.to_string());

@@ -1,23 +1,65 @@
 use std::iter::Peekable;
+use crate::source::FilePosition;
+use super::source::SourceError;
 use super::ast::{AST, Expr, Operator};
 use super::tokenizer::{Tokens, Token};
+use super::tokenizer::TokenType::*;
 
 
-pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, String> {
+const PARSE_ERROR: &'static str = "ParseError";
+
+
+#[derive(Debug)]
+pub struct ParseError {
+    pos: Option<FilePosition>,
+    msg: String,
+}
+
+impl SourceError for ParseError {
+    fn get_message(&self) -> &str {
+        &self.msg
+    }
+
+    fn get_position(&self) -> Option<FilePosition> {
+        self.pos
+    }
+
+    fn get_type(&self) -> &str {
+        PARSE_ERROR
+    }
+}
+
+impl ParseError {
+    fn new(pos: FilePosition, msg: String) -> ParseError {
+        ParseError {
+            pos: Some(pos),
+            msg,
+        }
+    }
+}
+
+
+pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
     let mut token_iter = tokens.iter().peekable();
 
     let expr = expression(&mut token_iter)?;
 
     match token_iter.peek() {
-        None | Some(Token::Eof{ pos: _ }) => (),
-        _ => { return Err(String::from("Failed to parse all tokens")); },
+        Some(token) if *token.get_type() == Eof => (),
+        None => (),
+        _ => {
+            return Err(ParseError {
+                pos:None,
+                msg: "Failed to parse all tokens".to_string(),
+            });
+        },
     }
 
     Ok(AST::new(expr ))
 }
 
 
-fn expression<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn expression<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
@@ -25,138 +67,224 @@ where
 }
 
 
-fn equality<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn _equality<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'b Token<'b>>
+{
+    let token = token_iter.peek()?;
+    match token.get_type() {
+        BangEqual => Some(Operator::NotEqual),
+        EqualEqual => Some(Operator::Equal),
+        _ => None,
+    }
+}
+
+
+fn equality<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
 {
     let expr = comparison(token_iter)?;
 
-    if let Some(op) = match token_iter.peek() {
-        Some(Token::BangEqual{ pos: _ }) => Some(Operator::NotEqual),
-        Some(Token::EqualEqual{ pos: _ }) => Some(Operator::Equal),
-        _ => None,
-    } {
-        token_iter.next();
-        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(comparison(token_iter)?) })
-    } else {
-        Ok(expr)
+    match _equality(token_iter) {
+        Some(op) => {
+            token_iter.next();
+            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(comparison(token_iter)?) })
+        },
+        None => Ok(expr),
     }
 }
 
 
-fn comparison<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn _comparison<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
-    let expr = term(token_iter)?;
-
-    if let Some(op) = match token_iter.peek() {
-        Some(Token::Greater{ pos: _ }) => Some(Operator::Greater),
-        Some(Token::GreaterEqual{ pos: _ }) => Some(Operator::GreaterEqual),
-        Some(Token::Less{ pos: _ }) => Some(Operator::Less),
-        Some(Token::LessEqual{ pos: _ }) => Some(Operator::LessEqual),
+    let token = token_iter.peek()?;
+    match token.get_type() {
+        Greater => Some(Operator::Greater),
+        GreaterEqual => Some(Operator::GreaterEqual),
+        Less => Some(Operator::Less),
+        LessEqual => Some(Operator::LessEqual),
         _ => None,
-    } {
-        token_iter.next();
-        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(term(token_iter)?) })
-    } else {
-        Ok(expr)
     }
 }
 
 
-fn term<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, String>
+fn comparison<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let expr = term(token_iter)?;
+
+    match _comparison(token_iter) {
+        Some(op) => {
+            token_iter.next();
+            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(term(token_iter)?) })
+        },
+        None => Ok(expr),
+    }
+}
+
+
+fn _term<'b, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let token = token_iter.peek()?;
+    match token.get_type() {
+        Minus => Some(Operator::Sub),
+        Plus => Some(Operator::Add),
+        _ => None,
+    }
+}
+
+
+fn term<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, ParseError>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
     let expr = factor(token_iter)?;
 
-    if let Some(op) = match token_iter.peek() {
-        Some(Token::Minus{ pos: _ }) => Some(Operator::Sub),
-        Some(Token::Plus{ pos: _ }) => Some(Operator::Add),
-        _ => None,
-    } {
-        token_iter.next();
-        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(factor(token_iter)?) })
-    } else {
-        Ok(expr)
+    match _term(token_iter) {
+        Some(op) => {
+            token_iter.next();
+            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(factor(token_iter)?) })
+        },
+        None => Ok(expr),
     }
 }
 
 
-fn factor<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn _factor<'b, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let token = token_iter.peek()?;
+    match token.get_type() {
+        Slash => Some(Operator::Div),
+        Star => Some(Operator::Mul),
+        _ => None,
+    }
+}
+
+
+fn factor<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, ParseError>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
     let expr = unary(token_iter)?;
 
-    if let Some(op) = match token_iter.peek() {
-        Some(Token::Slash{ pos: _ }) => Some(Operator::Div),
-        Some(Token::Star{ pos: _ }) => Some(Operator::Mul),
-        _ => None,
-    } {
-        token_iter.next();
-        Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(unary(token_iter)?) })
-    } else {
-        Ok(expr)
+    match _factor(token_iter) {
+        Some(op) => {
+            token_iter.next();
+            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(unary(token_iter)?) })
+        },
+        None => Ok(expr),
     }
 }
 
 
-fn unary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn _unary<'b, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
-    if let Some(op) = match token_iter.peek() {
-        Some(Token::Bang{ pos: _ }) => Some(Operator::Not),
-        Some(Token::Minus{ pos: _ }) => Some(Operator::Negate),
+    let token = token_iter.peek()?;
+    match token.get_type() {
+        Bang => Some(Operator::Not),
+        Minus => Some(Operator::Negate),
         _ => None,
-    } {
-        token_iter.next();
-        Ok(Expr::UnaryOp { op, operand: Box::new(unary(token_iter)?) })
-    } else {
-        primary(token_iter)
     }
 }
 
 
-fn primary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn unary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
-    if let Some(expr) = match token_iter.peek() {
-        Some(Token::False { pos: _ }) => Some(Expr::Bool { value: false }),
-        Some(Token::True { pos: _ }) => Some(Expr::Bool { value: true }),
-        Some(Token::Nil{ pos: _ }) => Some(Expr::Nil),
-        Some(Token::Number { pos: _, lexeme: _, value }) => Some(Expr::Numb{ value: *value }),
-        Some(Token::Str { pos: _, lexeme: _, value }) => Some(Expr::Str { value }),
-        _ => None,
-    } {
-        token_iter.next();
-        return Ok(expr);
+    match _unary(token_iter) {
+        Some(op) => {
+            token_iter.next();
+            Ok(Expr::UnaryOp { op, operand: Box::new(unary(token_iter)?) })
+        },
+        None => primary(token_iter),
     }
-
-    group(token_iter)
 }
 
 
-fn group<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, String>
+fn _primary<'b, I>(token_iter: &mut Peekable<I>) -> Option<Expr<'b>>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    let token = token_iter.peek()?;
+    match token.get_type() {
+        False => Some(Expr::Bool { value: false }),
+        True => Some(Expr::Bool { value: true }),
+        Nil => Some(Expr::Nil),
+        Number { lexeme: _, value } => Some(Expr::Numb{ value: *value }),
+        Str { lexeme: _, value } => Some(Expr::Str { value }),
+        _ => None,
+    }
+}
+
+
+fn primary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+where
+    I: Iterator<Item = &'b Token<'b>>
+{
+    match _primary(token_iter) {
+        Some(expr) => {
+            token_iter.next();
+            return Ok(expr);
+        },
+        None => group(token_iter),
+    }
+}
+
+
+fn group<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
     match token_iter.peek() {
-        Some(Token::LeftParen { pos: _ }) => {
+        Some(token) if *token.get_type() == LeftParen => {
             token_iter.next();
         },
-        other => {
-            return Err(format!("Failed to parse: {:#?}", other));
+        Some(token) => {
+            return Err(
+                ParseError::new(
+                    token.get_position(),
+                    format!("could not parse token type '{}'", token.get_type()),
+                ),
+            );
+        },
+        None => {
+            return Err(
+                ParseError {
+                    pos: None,
+                    msg: "invalid expression".to_string(),
+                },
+            )
         },
     }
 
     let expr = expression(token_iter)?;
     match token_iter.peek() {
-        Some(Token::RightParen { pos: _ }) => { token_iter.next(); },
-        _ => { return Err(String::from("Expect ')' after expression")); },
+        Some(token) if *token.get_type() == RightParen => { token_iter.next(); },
+        Some(other) => {
+            return Err(ParseError::new(
+                other.get_position(),
+                "Expected ')' after expression".to_string(),
+            ));
+        },
+        None => {
+            return Err(
+                ParseError {
+                    pos: None,
+                    msg: "Missing ')' at EOF".to_string(),
+                }
+            );
+        },
     }
 
     Ok(Expr::Group { expr: Box::new(expr) })
@@ -166,15 +294,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::tokenizer::FilePosition;
+    use crate::source::FilePosition;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn test_add() {
         let tokens = vec![
-            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
-            Token::Plus{ pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
+            Token::new(Plus, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
         ];
 
         let ast = parse(&tokens).unwrap();
@@ -194,11 +322,11 @@ mod tests {
     #[test]
     fn test_precidence_mul_over_add_1() {
         let tokens = vec![
-            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
-            Token::Plus{ pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
-            Token::Star{ pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
+            Token::new(Plus, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new(Star, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
         ];
 
         let ast = parse(&tokens).unwrap();
@@ -224,11 +352,11 @@ mod tests {
     #[test]
     fn test_precidence_mul_over_add_2() {
         let tokens = vec![
-            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
-            Token::Star{ pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
-            Token::Plus{ pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
+            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
+            Token::new(Star, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new(Plus, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
         ];
 
         let ast = parse(&tokens).unwrap();
@@ -254,14 +382,14 @@ mod tests {
     #[test]
     fn test_grouping() {
         let tokens = vec![
-            Token::Number{ value: 11.12, lexeme: "11.12", pos: FilePosition::new(2, 26) },
-            Token::Star{ pos: FilePosition::new(1, 9) },
-            Token::LeftParen { pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 12.0, lexeme: "12", pos: FilePosition::new(2, 26) },
-            Token::Plus{ pos: FilePosition::new(1, 9) },
-            Token::Number{ value: 3.0, lexeme: "12", pos: FilePosition::new(2, 26) },
-            Token::RightParen { pos: FilePosition::new(1, 9) },
-            Token::Eof { pos: FilePosition::new(12, 1) },
+            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
+            Token::new(Star, FilePosition::new(1, 9)),
+            Token::new(LeftParen, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new(Plus, FilePosition::new(1, 9)),
+            Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new(RightParen, FilePosition::new(1, 9)),
+            Token::new(Eof, FilePosition::new(12, 1)),
         ];
 
         let ast = parse(&tokens).unwrap();

@@ -16,9 +16,20 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, src: &mut Source) -> Result<String, String> {
-        let tokens = tokenize(src)?;
-        dbg!(&tokens);
-        let ast = parse(&tokens)?;
+        let tokens = match tokenize(src) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(src.format_error(&e));
+            },
+        };
+
+        let ast = match parse(&tokens) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(src.format_error(&e));
+            },
+        };
+
         evaluate(ast, &mut self.env)
     }
 }
