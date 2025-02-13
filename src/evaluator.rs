@@ -69,6 +69,8 @@ pub fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
             )
         },
         EGroup { expr } => eval(expr.as_ref(), env),
+        EVar { name } => todo!(),
+        EAssign { name, expr } => todo!(),
     }
 }
 

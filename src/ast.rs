@@ -107,7 +107,7 @@ impl<'a> fmt::Display for Expr<'a> {
                 operand,
             ),
             EGroup{ expr } => format!("({})", expr),
-            EVar{ name } => format!("{}", name),
+            EVar{ name } => format!("var {}", name),
             EAssign{ name, expr } => format!(
                 "{} = {}",
                 name,

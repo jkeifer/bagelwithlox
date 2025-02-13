@@ -45,7 +45,7 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
     let mut token_iter = PrevPeekable::new(tokens.iter());
 
     while let Some(token) = token_iter.peek() {
-        ast.top.push(statement(token, &mut token_iter)?);
+        ast.top.push(declaration(token, &mut token_iter)?);
     }
 
     Ok(ast)
@@ -68,6 +68,37 @@ pub fn parse_expr<'a>(tokens: &'a Tokens<'a>) -> Result<Expr<'a>, ParseError> {
     }
 
     Ok(expr)
+}
+
+
+fn declaration<'a, I>(token: &'a Token, token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    match token.get_type() {
+        Var => var_declaration(token_iter),
+        _ => statement(token, token_iter),
+    }
+}
+
+
+fn var_declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+
+    let id = expect(token_iter, Identifier)?;
+    let init = match token_iter.peek() {
+        Some(token) => match token.get_type() {
+            Equal => Some(expression(token_iter)?),
+            _ => None,
+        },
+        None => None,
+    };
+
+    expect(token_iter, SemiColon)?;
+    Ok(Stmt::SVar{ name: id.lexeme, value: init })
 }
 
 
@@ -273,7 +304,7 @@ where
             Some(LiteralValue::LString(value)) => Some(Expr::EStr { value }),
             _ => None,
         },
-        Identifier => Some(Expr::EVar
+        Identifier => Some(Expr::EVar { name: token.lexeme }),
         _ => None,
     }
 }
