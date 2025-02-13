@@ -59,17 +59,17 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
 }
 
 
-fn expression<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+fn expression<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     equality(token_iter)
 }
 
 
-fn _equality<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Option<Operator>
+fn _equality<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let token = token_iter.peek()?;
     match token.get_type() {
@@ -96,9 +96,9 @@ where
 }
 
 
-fn _comparison<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Option<Operator>
+fn _comparison<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let token = token_iter.peek()?;
     match token.get_type() {
@@ -127,9 +127,9 @@ where
 }
 
 
-fn _term<'b, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _term<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let token = token_iter.peek()?;
     match token.get_type() {
@@ -140,9 +140,9 @@ where
 }
 
 
-fn term<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+fn term<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let expr = factor(token_iter)?;
 
@@ -156,9 +156,9 @@ where
 }
 
 
-fn _factor<'b, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _factor<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let token = token_iter.peek()?;
     match token.get_type() {
@@ -169,9 +169,9 @@ where
 }
 
 
-fn factor<'a, 'b, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+fn factor<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let expr = unary(token_iter)?;
 
@@ -185,9 +185,9 @@ where
 }
 
 
-fn _unary<'b, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _unary<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     let token = token_iter.peek()?;
     match token.get_type() {
@@ -198,9 +198,9 @@ where
 }
 
 
-fn unary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+fn unary<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     match _unary(token_iter) {
         Some(op) => {
@@ -228,9 +228,9 @@ where
 }
 
 
-fn primary<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+fn primary<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     match _primary(token_iter) {
         Some(expr) => {
@@ -242,9 +242,9 @@ where
 }
 
 
-fn group<'a, 'b, I>(token_iter: &'a mut Peekable<I>) -> Result<Expr<'b>, ParseError>
+fn group<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
 where
-    I: Iterator<Item = &'b Token<'b>>
+    I: Iterator<Item = &'a Token<'a>>
 {
     match token_iter.peek() {
         Some(token) if *token.get_type() == LeftParen => {
