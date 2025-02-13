@@ -1,8 +1,8 @@
-use std::iter::Peekable;
+use prev_iter::PrevPeekable;
 use crate::source::FilePosition;
 use super::source::SourceError;
-use super::ast::{AST, Expr, Operator};
-use super::tokenizer::{Tokens, Token};
+use super::ast::{AST, Expr, Operator, Stmt};
+use super::tokenizer::{Tokens, Token, TokenType};
 use super::tokenizer::TokenType::*;
 
 
@@ -40,12 +40,23 @@ impl ParseError {
 
 
 pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
-    let mut token_iter = tokens.iter().peekable();
+    let mut ast = AST::new();
+    let mut token_iter = PrevPeekable::new(tokens.iter());
+
+    while let Some(token) = token_iter.peek() {
+        ast.top.push(statement(token, &mut token_iter)?);
+    }
+
+    Ok(ast)
+}
+
+
+pub fn parse_expr<'a>(tokens: &'a Tokens<'a>) -> Result<Expr<'a>, ParseError> {
+    let mut token_iter = PrevPeekable::new(tokens.iter());
 
     let expr = expression(&mut token_iter)?;
 
     match token_iter.peek() {
-        Some(token) if *token.get_type() == Eof => (),
         None => (),
         _ => {
             return Err(ParseError {
@@ -55,11 +66,43 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
         },
     }
 
-    Ok(AST::new(expr ))
+    Ok(expr)
 }
 
 
-fn expression<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn statement<'a, I>(token: &'a Token, token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    match token.get_type() {
+        Print => print_statement(token_iter),
+        _ => expression_statement(token_iter),
+    }
+}
+
+
+fn print_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+    let expr = expression(token_iter)?;
+    expect(token_iter, SemiColon)?;
+    Ok(Stmt::SPrint(expr))
+}
+
+
+fn expression_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let expr = expression(token_iter)?;
+    expect(token_iter, SemiColon)?;
+    Ok(Stmt::SExprStmt(expr))
+}
+
+
+fn expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -67,7 +110,7 @@ where
 }
 
 
-fn _equality<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _equality<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -80,7 +123,7 @@ where
 }
 
 
-fn equality<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn equality<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -96,7 +139,7 @@ where
 }
 
 
-fn _comparison<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _comparison<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -111,7 +154,7 @@ where
 }
 
 
-fn comparison<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn comparison<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -127,7 +170,7 @@ where
 }
 
 
-fn _term<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _term<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -140,7 +183,7 @@ where
 }
 
 
-fn term<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn term<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -156,7 +199,7 @@ where
 }
 
 
-fn _factor<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _factor<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -169,7 +212,7 @@ where
 }
 
 
-fn factor<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn factor<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -185,7 +228,7 @@ where
 }
 
 
-fn _unary<'a, I>(token_iter: &mut Peekable<I>) -> Option<Operator>
+fn _unary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Operator>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -198,7 +241,7 @@ where
 }
 
 
-fn unary<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn unary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -212,7 +255,7 @@ where
 }
 
 
-fn _primary<'b, I>(token_iter: &mut Peekable<I>) -> Option<Expr<'b>>
+fn _primary<'b, I>(token_iter: &mut PrevPeekable<I>) -> Option<Expr<'b>>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
@@ -222,13 +265,13 @@ where
         True => Some(Expr::Bool { value: true }),
         Nil => Some(Expr::Nil),
         Number { lexeme: _, value } => Some(Expr::Numb{ value: *value }),
-        Str { lexeme: _, value } => Some(Expr::Str { value }),
+        Str { pos_end: _, lexeme: _, value } => Some(Expr::Str { value }),
         _ => None,
     }
 }
 
 
-fn primary<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn primary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -242,7 +285,7 @@ where
 }
 
 
-fn group<'a, I>(token_iter: &mut Peekable<I>) -> Result<Expr<'a>, ParseError>
+fn group<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -269,25 +312,39 @@ where
     }
 
     let expr = expression(token_iter)?;
-    match token_iter.peek() {
-        Some(token) if *token.get_type() == RightParen => { token_iter.next(); },
-        Some(other) => {
-            return Err(ParseError::new(
-                other.get_position(),
-                "Expected ')' after expression".to_string(),
-            ));
-        },
-        None => {
-            return Err(
-                ParseError {
-                    pos: None,
-                    msg: "Missing ')' at EOF".to_string(),
-                }
-            );
-        },
-    }
+    expect(token_iter, RightParen)?;
 
     Ok(Expr::Group { expr: Box::new(expr) })
+}
+
+
+fn expect<'a, I>(
+    token_iter: &mut PrevPeekable<I>,
+    ttype: TokenType,
+) -> Result<(), ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+
+    let make_err = |t: Option<&Token>| -> Result<(), ParseError> {
+        Err(match t {
+            Some(token) => ParseError::new(
+                token.get_position(),
+                format!("expected '{}' after expression", ttype.lexeme()),
+            ),
+            None => ParseError {
+                pos: None,
+                msg: format!("missing '{}' at EOF", ttype.lexeme()),
+            },
+        })
+    };
+
+    match (token_iter.next(), token_iter.prev_peek()) {
+        (Some(token), _) if *token.get_type() == ttype => Ok(()),
+        (None, Some(token)) => make_err(Some(token)),
+        (Some(token), _) => make_err(Some(token)),
+        (None, None) => make_err(None),
+    }
 }
 
 
@@ -305,17 +362,15 @@ mod tests {
             Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
         ];
 
-        let ast = parse(&tokens).unwrap();
+        let expr = parse_expr(&tokens).unwrap();
 
         assert_eq!(
-            ast,
-            AST::new(
-                Expr::BinOp {
-                    op: Operator::Add,
-                    left: Box::new(Expr::Numb { value: 11.12 }),
-                    right: Box::new(Expr::Numb { value: 12.0 }),
-                },
-            ),
+            expr,
+            Expr::BinOp {
+                op: Operator::Add,
+                left: Box::new(Expr::Numb { value: 11.12 }),
+                right: Box::new(Expr::Numb { value: 12.0 }),
+            },
         );
     }
 
@@ -329,23 +384,21 @@ mod tests {
             Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
         ];
 
-        let ast = parse(&tokens).unwrap();
+        let expr = parse_expr(&tokens).unwrap();
 
         assert_eq!(
-            ast,
-            AST::new(
-                Expr::BinOp {
-                    op: Operator::Add,
-                    left: Box::new(Expr::Numb { value: 11.12 }),
-                    right: Box::new(
-                        Expr::BinOp {
-                            op: Operator::Mul,
-                            left: Box::new(Expr::Numb { value: 12.0 }),
-                            right: Box::new(Expr::Numb { value: 3.0 }),
-                        },
-                    ),
-                },
-            ),
+            expr,
+            Expr::BinOp {
+                op: Operator::Add,
+                left: Box::new(Expr::Numb { value: 11.12 }),
+                right: Box::new(
+                    Expr::BinOp {
+                        op: Operator::Mul,
+                        left: Box::new(Expr::Numb { value: 12.0 }),
+                        right: Box::new(Expr::Numb { value: 3.0 }),
+                    },
+                ),
+            },
         );
     }
 
@@ -359,23 +412,21 @@ mod tests {
             Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
         ];
 
-        let ast = parse(&tokens).unwrap();
+        let expr = parse_expr(&tokens).unwrap();
 
         assert_eq!(
-            ast,
-            AST::new(
-                Expr::BinOp {
-                    op: Operator::Add,
-                    left: Box::new(
-                        Expr::BinOp {
-                            op: Operator::Mul,
-                            left: Box::new(Expr::Numb { value: 11.12 }),
-                            right: Box::new(Expr::Numb { value: 12.0 }),
-                        },
-                    ),
-                    right: Box::new(Expr::Numb { value: 3.0 }),
-                },
-            ),
+            expr,
+            Expr::BinOp {
+                op: Operator::Add,
+                left: Box::new(
+                    Expr::BinOp {
+                        op: Operator::Mul,
+                        left: Box::new(Expr::Numb { value: 11.12 }),
+                        right: Box::new(Expr::Numb { value: 12.0 }),
+                    },
+                ),
+                right: Box::new(Expr::Numb { value: 3.0 }),
+            },
         );
     }
 
@@ -389,30 +440,28 @@ mod tests {
             Token::new(Plus, FilePosition::new(1, 9)),
             Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
             Token::new(RightParen, FilePosition::new(1, 9)),
-            Token::new(Eof, FilePosition::new(12, 1)),
+            //Token::new(Eof, FilePosition::new(12, 1)),
         ];
 
-        let ast = parse(&tokens).unwrap();
+        let expr = parse_expr(&tokens).unwrap();
 
         assert_eq!(
-            ast,
-            AST::new(
-                Expr::BinOp {
-                    op: Operator::Mul,
-                    left: Box::new(Expr::Numb { value: 11.12 }),
-                    right: Box::new(
-                        Expr::Group{
-                            expr: Box::new(
-                                Expr::BinOp {
-                                    op: Operator::Add,
-                                    left: Box::new(Expr::Numb { value: 12.0 }),
-                                    right: Box::new(Expr::Numb { value: 3.0 }),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
+            expr,
+            Expr::BinOp {
+                op: Operator::Mul,
+                left: Box::new(Expr::Numb { value: 11.12 }),
+                right: Box::new(
+                    Expr::Group{
+                        expr: Box::new(
+                            Expr::BinOp {
+                                op: Operator::Add,
+                                left: Box::new(Expr::Numb { value: 12.0 }),
+                                right: Box::new(Expr::Numb { value: 3.0 }),
+                            },
+                        ),
+                    },
+                ),
+            },
         );
     }
 }

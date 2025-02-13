@@ -117,7 +117,7 @@ pub enum TokenType<'a> {
 
     // Literals.
     Identifier{ lexeme: &'a str },
-    Str{ lexeme: &'a str, value: &'a str },
+    Str{ pos_end: FilePosition, lexeme: &'a str, value: &'a str },
     Number{ lexeme: &'a str, value: f64 },
 
     // Keywords.
@@ -150,6 +150,62 @@ impl<'a> fmt::Display for TokenType<'a> {
             TokenType::Number{..} => "Number".to_string(),
             _ => format!("{:?}", self),
         })
+    }
+}
+
+impl<'a> TokenType<'a> {
+    pub fn lexeme(&self) -> &str {
+        use TokenType::*;
+        match self {
+            LeftParen => "(",
+            RightParen => ")",
+            LeftBrace => "{",
+            RightBrace => "}",
+            Comma => ",",
+            Dot => ".",
+            Minus => "-",
+            Plus => "+",
+            SemiColon => ";",
+            Star => "*",
+
+            // One Or Two Character Tokens.
+            Bang => "!",
+            BangEqual => "!=",
+            Equal => "=",
+            EqualEqual => "==",
+            Greater => ">",
+            GreaterEqual => ">=",
+            Less => "<",
+            LessEqual => "<=",
+            Slash => "/",
+            Comment{ lexeme: _ } => "//",
+
+            // Literals.
+            Identifier{ lexeme: v } => v,
+            Str{ pos_end: _, lexeme: v, value: _ } => v,
+            Number{ lexeme: v, value: _ } => v,
+
+            // Keywords.
+            And => "and",
+            Class => "class",
+            Else => "else",
+            False => "false",
+            Fun => "fun",
+            For => "for",
+            If => "if",
+            Nil => "nil",
+            Or => "or",
+            Print => "print",
+            Return => "return",
+            Super => "super",
+            This => "this",
+            True => "true",
+            Var => "var",
+            While => "while",
+
+            // This token should probably be removed...
+            Eof => "EOF",
+        }
     }
 }
 
@@ -261,7 +317,7 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, TokenizeError> {
                     None => {
                         // we got to the end without a "
                         return Err(TokenizeError::new(
-                            pos,
+                            ch_idxs.filepos,
                             "unterminated string literal".to_string(),
                         ));
                     },
@@ -269,6 +325,7 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, TokenizeError> {
 
                 Token::new(
                     Str {
+                        pos_end: ch_idxs.filepos,
                         lexeme: &src.content[start..=end],
                         value: &src.content[start+1..=end-1],
                     },
@@ -328,9 +385,9 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, TokenizeError> {
 
     }
 
-    let mut pos = ch_idxs.filepos;
-    pos.linepos += 1;
-    tokens.push(Token::new(Eof, pos));
+    //let mut pos = ch_idxs.filepos;
+    //pos.linepos += 1;
+    //tokens.push(Token::new(Eof, pos));
 
     Ok(tokens)
 }
@@ -365,7 +422,7 @@ mod tests {
                 Token::new(Equal, FilePosition::nwl(1, 25, 1)),
                 Token::new(Less, FilePosition::nwl(1, 27, 1)),
                 Token::new(Greater, FilePosition::nwl(1, 29, 1)),
-                Token::new(Eof, FilePosition::nwl(1, 30, 0)),
+                //Token::new(Eof, FilePosition::nwl(1, 30, 0)),
            ],
         );
     }
@@ -382,7 +439,7 @@ mod tests {
                 Token::new(EqualEqual, FilePosition::nwl(1, 4, 2)),
                 Token::new(LessEqual, FilePosition::nwl(1, 7, 2)),
                 Token::new(GreaterEqual, FilePosition::nwl(1, 10, 2)),
-                Token::new(Eof, FilePosition::nwl(1, 12, 0)),
+                //Token::new(Eof, FilePosition::nwl(1, 12, 0)),
             ],
         );
     }
@@ -398,7 +455,7 @@ mod tests {
                 Token::new(Identifier { lexeme: "abc" }, FilePosition::nwl(1, 1, 3)),
                 Token::new(Identifier { lexeme: "abc123" }, FilePosition::nwl(1, 5, 6)),
                 Token::new(Identifier { lexeme: "_x_3_4_"}, FilePosition::nwl(1, 12, 7)),
-                Token::new(Eof, FilePosition::nwl(2, 1, 0)),
+                //Token::new(Eof, FilePosition::nwl(2, 1, 0)),
             ],
         );
     }
@@ -427,7 +484,7 @@ mod tests {
                 Token::new(True, FilePosition::nwl(1, 64, 4)),
                 Token::new(Var, FilePosition::nwl(1, 69, 3)),
                 Token::new(While, FilePosition::nwl(1, 73, 5)),
-                Token::new(Eof, FilePosition::nwl(1, 78, 0)),
+                //Token::new(Eof, FilePosition::nwl(1, 78, 0)),
             ],
         );
     }
@@ -443,22 +500,30 @@ mod tests {
                 Token::new(Number{ value: 1.0, lexeme: "1" }, FilePosition::nwl(1, 1, 1)),
                 Token::new(Number{ value: 1234.0, lexeme: "1234" }, FilePosition::nwl(1, 3, 4)),
                 Token::new(Number{ value: 12.34, lexeme: "12.34" }, FilePosition::nwl(1, 8, 5)),
-                Token::new(Eof, FilePosition::nwl(1, 13, 0)),
+                //Token::new(Eof, FilePosition::nwl(1, 13, 0)),
             ],
         );
     }
 
     #[test]
     fn test_strings() {
-        let tstr = "\"hello\" \"world\"";
+        let tstr = "\"hello\" \"wor\nld\"";
         let source = Source::from_string(tstr.to_string());
         let tokens = tokenize(&source).unwrap();
         assert_eq!(
             tokens,
             vec![
-                Token::new(Str{ value: "hello", lexeme:  "\"hello\"" }, FilePosition::nwl(1, 1, 1)),
-                Token::new(Str{ value: "world", lexeme: "\"world\"" }, FilePosition::nwl(1, 9, 1)),
-                Token::new(Eof, FilePosition::nwl(1, 16, 0)),
+                Token::new(Str{
+                    value: "hello",
+                    lexeme:  "\"hello\"",
+                    pos_end: FilePosition::new(1, 7),
+                }, FilePosition::nwl(1, 1, 1)),
+                Token::new(Str{
+                    value: "wor\nld",
+                    lexeme: "\"wor\nld\"",
+                    pos_end: FilePosition::new(2, 3),
+                }, FilePosition::nwl(1, 9, 1)),
+                //Token::new(Eof, FilePosition::nwl(1, 16, 0)),
             ],
         );
     }
@@ -493,7 +558,7 @@ mod tests {
                 Token::new(Else, FilePosition::nwl(2, 15, 4)),
                 Token::new(Identifier{ lexeme:  "death" }, FilePosition::nwl(2, 20, 5)),
                 Token::new(Number{ value: 11.12, lexeme: "11.12" }, FilePosition::nwl(2, 26, 5)),
-                Token::new(Eof, FilePosition::nwl(2, 32, 0)),
+                //Token::new(Eof, FilePosition::nwl(2, 32, 0)),
             ],
         );
     }

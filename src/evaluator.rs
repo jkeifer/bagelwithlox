@@ -1,4 +1,4 @@
-use super::ast::{AST, Expr, Operator};
+use super::ast::{Expr, Operator};
 use super::environment::Environment;
 use super::value::LoxValue;
 
@@ -46,7 +46,7 @@ fn eval_unary_op(
 }
 
 
-fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
+pub fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
     use Expr::*;
     use LoxValue::*;
     match expr {
@@ -73,14 +73,6 @@ fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
 }
 
 
-pub fn evaluate(ast: AST, env: &mut Environment) -> Result<String, String> {
-    match eval(&ast.top, env) {
-        Ok(val) => Ok(format!("{}", val.value_string())),
-        Err(e) => Err(e),
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,8 +85,8 @@ mod tests {
             text.to_string(),
         );
         let tokens = crate::tokenizer::tokenize(&src).unwrap();
-        let ast = crate::parser::parse(&tokens).unwrap();
-        eval(&ast.top, &mut env).unwrap()
+        let expr = crate::parser::parse_expr(&tokens).unwrap();
+        eval(&expr, &mut env).unwrap()
     }
 
     #[test]

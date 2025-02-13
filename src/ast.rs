@@ -111,13 +111,23 @@ impl<'a> fmt::Display for Expr<'a> {
 
 
 #[derive(Debug, PartialEq)]
+pub enum Stmt<'a> {
+    SPrint(Expr<'a>),
+    SVar{ name: &'a str, value: Option<Expr<'a>> },
+    SExprStmt(Expr<'a>),
+}
+
+pub type Stmts<'a> = Vec<Stmt<'a>>;
+
+
+#[derive(Debug, PartialEq)]
 pub struct AST<'a> {
-    pub top : Expr<'a>
+    pub top : Stmts<'a>
 }
 
 impl<'a> AST<'a> {
-    pub fn new(top: Expr<'a>) -> AST<'a> {
-        AST { top }
+    pub fn new() -> AST<'a> {
+        AST { top: vec![] }
     }
 }
 

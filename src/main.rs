@@ -1,10 +1,10 @@
 use clap::Parser;
 use std::io;
-use std::io::Error;
 use std::io::IsTerminal;
-use std::io::prelude::*;
 use bagelwithlox::source::Source;
 use bagelwithlox::interpreter::Interpreter;
+use rustyline::error::ReadlineError;
+use rustyline::{DefaultEditor, Result as RLResult};
 
 #[derive(Parser)]
 #[command(
@@ -45,38 +45,40 @@ impl Cli {
 }
 
 
-fn read_stdin_line(input: &mut String) -> Result<(), Error> {
-    input.clear();
-    io::stdout().write(b"bwl > ")?;
-    io::stdout().flush()?;
-    match io::stdin().read_line(input) {
-        Err(e) => Err(e),
-        _ => Ok(()),
-    }
-}
-
-
-fn repl(interpreter: &mut Interpreter) -> Result<(), String> {
+fn repl(interpreter: &mut Interpreter) -> RLResult<()> {
     eprintln!("Running the repl!");
-    let mut input = String::new();
+    let mut rl = DefaultEditor::new()?;
 
     loop {
-        match read_stdin_line(&mut input) {
-            Err(e) => return Err(format!("Failed to read stdin: {}", e)),
-            _ => (),
-        }
-
-        if input == "" { return Ok(()); }
-        if input == "\n" { continue; }
-
-
-        match interpreter.interpret(
-            &mut Source::from_string(input.to_string()),
-        ) {
-            Ok(result) => println!("{}", result),
-            Err(e) => eprintln!("{}", e),
+        let readline = rl.readline("bwl >");
+        match readline {
+            Ok(line) => {
+                if line.trim() == "" { continue; }
+                rl.add_history_entry(line.as_str())?;
+                match interpreter.interpret(
+                    &mut Source::from_string(line.to_string()),
+                ) {
+                    Ok(Some(result)) => println!("{}", result),
+                    Ok(None) => (),
+                    Err(e) => eprintln!("{}", e),
+                }
+            },
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break
+            },
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break
+            },
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break
+            }
         }
     }
+
+    Ok(())
 }
 
 
