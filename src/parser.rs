@@ -1,5 +1,6 @@
 use prev_iter::PrevPeekable;
 use crate::source::FilePosition;
+use crate::tokenizer::LiteralValue;
 use super::source::SourceError;
 use super::ast::{AST, Expr, Operator, Stmt};
 use super::tokenizer::{Tokens, Token, TokenType};
@@ -264,8 +265,14 @@ where
         False => Some(Expr::Bool { value: false }),
         True => Some(Expr::Bool { value: true }),
         Nil => Some(Expr::Nil),
-        Number { lexeme: _, value } => Some(Expr::Numb{ value: *value }),
-        Str { pos_end: _, lexeme: _, value } => Some(Expr::Str { value }),
+        Number => match token.literal {
+            Some(LiteralValue::LNumber(value)) => Some(Expr::Numb { value }),
+            _ => None,
+        },
+        Str => match token.literal {
+            Some(LiteralValue::LString(value)) => Some(Expr::Str { value }),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -318,29 +325,36 @@ where
 }
 
 
-fn expect<'a, I>(
+fn expect<'a, 'b, I>(
     token_iter: &mut PrevPeekable<I>,
     ttype: TokenType,
-) -> Result<(), ParseError>
+) -> Result<&'a Token<'a>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
 
-    let make_err = |t: Option<&Token>| -> Result<(), ParseError> {
+    let make_err = |t: Option<&Token>| -> Result<&'a Token<'a>, ParseError> {
+        let tstr = match ttype.lexeme() {
+            Some(v) => format!("'{}'", v),
+            None => format!("{}", ttype),
+        };
+
         Err(match t {
             Some(token) => ParseError::new(
                 token.get_position(),
-                format!("expected '{}' after expression", ttype.lexeme()),
+                format!("expected {} after expression", tstr),
             ),
             None => ParseError {
                 pos: None,
-                msg: format!("missing '{}' at EOF", ttype.lexeme()),
+                msg: format!("missing {} at EOF", tstr),
             },
         })
     };
 
+    // We have to get next first so prev is the last token.
+    // In other words we can't see current without making it prev.
     match (token_iter.next(), token_iter.prev_peek()) {
-        (Some(token), _) if *token.get_type() == ttype => Ok(()),
+        (Some(token), _) if *token.get_type() == ttype => Ok(token),
         (None, Some(token)) => make_err(Some(token)),
         (Some(token), _) => make_err(Some(token)),
         (None, None) => make_err(None),
@@ -357,9 +371,19 @@ mod tests {
     #[test]
     fn test_add() {
         let tokens = vec![
-            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
-            Token::new(Plus, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "11.12",
+                LiteralValue::LNumber(11.12),
+            ),
+            Token::nol(Plus, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "12",
+                LiteralValue::LNumber(12.0),
+            ),
         ];
 
         let expr = parse_expr(&tokens).unwrap();
@@ -377,11 +401,26 @@ mod tests {
     #[test]
     fn test_precidence_mul_over_add_1() {
         let tokens = vec![
-            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
-            Token::new(Plus, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
-            Token::new(Star, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "11.12",
+                LiteralValue::LNumber(11.12),
+            ),
+            Token::nol(Plus, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "12",
+                LiteralValue::LNumber(12.0),
+            ),
+            Token::nol(Star, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "3",
+                LiteralValue::LNumber(3.0),
+            ),
         ];
 
         let expr = parse_expr(&tokens).unwrap();
@@ -405,11 +444,26 @@ mod tests {
     #[test]
     fn test_precidence_mul_over_add_2() {
         let tokens = vec![
-            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
-            Token::new(Star, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
-            Token::new(Plus, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "11.12",
+                LiteralValue::LNumber(11.12),
+            ),
+            Token::nol(Star, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "12",
+                LiteralValue::LNumber(12.0),
+            ),
+            Token::nol(Plus, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "3",
+                LiteralValue::LNumber(3.0),
+            ),
         ];
 
         let expr = parse_expr(&tokens).unwrap();
@@ -433,14 +487,28 @@ mod tests {
     #[test]
     fn test_grouping() {
         let tokens = vec![
-            Token::new(Number{ value: 11.12, lexeme: "11.12"}, FilePosition::new(2, 26)),
-            Token::new(Star, FilePosition::new(1, 9)),
-            Token::new(LeftParen, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 12.0, lexeme: "12"}, FilePosition::new(2, 26)),
-            Token::new(Plus, FilePosition::new(1, 9)),
-            Token::new(Number{ value: 3.0, lexeme: "12"}, FilePosition::new(2, 26)),
-            Token::new(RightParen, FilePosition::new(1, 9)),
-            //Token::new(Eof, FilePosition::new(12, 1)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "11.12",
+                LiteralValue::LNumber(11.12),
+            ),
+            Token::nol(Star, FilePosition::new(1, 9)),
+            Token::nol(LeftParen, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "12",
+                LiteralValue::LNumber(12.0),
+            ),
+            Token::nol(Plus, FilePosition::new(1, 9)),
+            Token::new_literal(
+                Number,
+                FilePosition::new(2, 26),
+                "3",
+                LiteralValue::LNumber(3.0),
+            ),
+            Token::nol(RightParen, FilePosition::new(1, 9)),
         ];
 
         let expr = parse_expr(&tokens).unwrap();
