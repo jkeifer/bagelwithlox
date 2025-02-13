@@ -50,25 +50,25 @@ pub fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
     use Expr::*;
     use LoxValue::*;
     match expr {
-        Numb { value } => Ok(VNumb(*value)),
-        Str { value } => Ok(VStr(value.to_string())),
-        Bool { value } => Ok(VBool(*value)),
-        Nil => Ok(VNil),
-        BinOp { op, left, right } => {
+        ENumb { value } => Ok(VNumb(*value)),
+        EStr { value } => Ok(VStr(value.to_string())),
+        EBool { value } => Ok(VBool(*value)),
+        ENil => Ok(VNil),
+        EBinOp { op, left, right } => {
             eval_bin_op(
-                &op,
-                &eval(left.as_ref(), env)?,
-                &eval(right.as_ref(), env)?,
-                env,
+                    &op,
+                      &eval(left.as_ref(), env)?,
+                       &eval(right.as_ref(), env)?,
+                     env,
             )
         },
-        UnaryOp { op, operand } => {
+        EUnaryOp { op, operand } => {
             eval_unary_op(
                 &op,
                 &eval(operand.as_ref(), env)?,
             )
         },
-        Group { expr } => eval(expr.as_ref(), env),
+        EGroup { expr } => eval(expr.as_ref(), env),
     }
 }
 

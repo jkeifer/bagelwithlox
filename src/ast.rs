@@ -76,35 +76,43 @@ impl Operator {
 
 #[derive(Debug, PartialEq)]
 pub enum Expr<'a> {
-    Numb{ value: f64 },
-    Str{ value: &'a str },
-    Bool{ value: bool },
-    Nil,
-    BinOp{ op: Operator, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
-    UnaryOp{ op: Operator, operand: Box<Expr<'a>> },
-    Group{ expr: Box<Expr<'a>> },
+    ENumb{ value: f64 },
+    EStr{ value: &'a str },
+    EBool{ value: bool },
+    ENil,
+    EBinOp{ op: Operator, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
+    EUnaryOp{ op: Operator, operand: Box<Expr<'a>> },
+    EGroup{ expr: Box<Expr<'a>> },
+    EVar{ name: &'a str },
+    EAssign{ name: &'a str, expr: Box<Expr<'a>>},
 }
 
 impl<'a> fmt::Display for Expr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Expr::*;
         write!(f, "{}", match self {
-            Numb{ value } => format!("{}", value),
-            Str{ value } => format!("\"{}\"", value),
-            Bool{ value } => format!("{}", value),
-            Nil => String::from("nil"),
-            BinOp{ op, left, right} => format!(
+            ENumb{ value } => format!("{}", value),
+            EStr{ value } => format!("\"{}\"", value),
+            EBool{ value } => format!("{}", value),
+            ENil => String::from("nil"),
+            EBinOp{ op, left, right} => format!(
                 "({} {} {})",
                 left,
                 op,
                 right,
             ),
-            UnaryOp{ op, operand} => format!(
+            EUnaryOp{ op, operand} => format!(
                 "{}{}",
                 op,
                 operand,
             ),
-            Group{ expr } => format!("({})", expr),
+            EGroup{ expr } => format!("({})", expr),
+            EVar{ name } => format!("{}", name),
+            EAssign{ name, expr } => format!(
+                "{} = {}",
+                name,
+                expr,
+            ),
         })
     }
 }
@@ -141,14 +149,14 @@ mod tests {
     fn test_() {
         use Expr::*;
         use Operator::*;
-        let e = BinOp{
+        let e = EBinOp{
             op: Mul,
-            left: Box::new(UnaryOp{
+            left: Box::new(EUnaryOp{
                 op: Negate,
-                operand: Box::new(Numb { value: 123.0 }),
+                operand: Box::new(ENumb { value: 123.0 }),
             }),
-            right: Box::new(Group{
-                expr: Box::new(Numb{
+            right: Box::new(EGroup{
+                expr: Box::new(ENumb{
                     value: 45.67,
                 }),
             }),

@@ -133,7 +133,7 @@ where
     match _equality(token_iter) {
         Some(op) => {
             token_iter.next();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(comparison(token_iter)?) })
+            Ok(Expr::EBinOp { op, left: Box::new(expr), right: Box::new(comparison(token_iter)?) })
         },
         None => Ok(expr),
     }
@@ -164,7 +164,7 @@ where
     match _comparison(token_iter) {
         Some(op) => {
             token_iter.next();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(term(token_iter)?) })
+            Ok(Expr::EBinOp { op, left: Box::new(expr), right: Box::new(term(token_iter)?) })
         },
         None => Ok(expr),
     }
@@ -193,7 +193,7 @@ where
     match _term(token_iter) {
         Some(op) => {
             token_iter.next();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(factor(token_iter)?) })
+            Ok(Expr::EBinOp { op, left: Box::new(expr), right: Box::new(factor(token_iter)?) })
         },
         None => Ok(expr),
     }
@@ -222,7 +222,7 @@ where
     match _factor(token_iter) {
         Some(op) => {
             token_iter.next();
-            Ok(Expr::BinOp { op, left: Box::new(expr), right: Box::new(unary(token_iter)?) })
+            Ok(Expr::EBinOp { op, left: Box::new(expr), right: Box::new(unary(token_iter)?) })
         },
         None => Ok(expr),
     }
@@ -249,7 +249,7 @@ where
     match _unary(token_iter) {
         Some(op) => {
             token_iter.next();
-            Ok(Expr::UnaryOp { op, operand: Box::new(unary(token_iter)?) })
+            Ok(Expr::EUnaryOp { op, operand: Box::new(unary(token_iter)?) })
         },
         None => primary(token_iter),
     }
@@ -262,17 +262,18 @@ where
 {
     let token = token_iter.peek()?;
     match token.get_type() {
-        False => Some(Expr::Bool { value: false }),
-        True => Some(Expr::Bool { value: true }),
-        Nil => Some(Expr::Nil),
+        False => Some(Expr::EBool { value: false }),
+        True => Some(Expr::EBool { value: true }),
+        Nil => Some(Expr::ENil),
         Number => match token.literal {
-            Some(LiteralValue::LNumber(value)) => Some(Expr::Numb { value }),
+            Some(LiteralValue::LNumber(value)) => Some(Expr::ENumb { value }),
             _ => None,
         },
         Str => match token.literal {
-            Some(LiteralValue::LString(value)) => Some(Expr::Str { value }),
+            Some(LiteralValue::LString(value)) => Some(Expr::EStr { value }),
             _ => None,
         },
+        Identifier => Some(Expr::EVar
         _ => None,
     }
 }
@@ -321,7 +322,7 @@ where
     let expr = expression(token_iter)?;
     expect(token_iter, RightParen)?;
 
-    Ok(Expr::Group { expr: Box::new(expr) })
+    Ok(Expr::EGroup { expr: Box::new(expr) })
 }
 
 
@@ -390,10 +391,10 @@ mod tests {
 
         assert_eq!(
             expr,
-            Expr::BinOp {
+            Expr::EBinOp {
                 op: Operator::Add,
-                left: Box::new(Expr::Numb { value: 11.12 }),
-                right: Box::new(Expr::Numb { value: 12.0 }),
+                left: Box::new(Expr::ENumb { value: 11.12 }),
+                right: Box::new(Expr::ENumb { value: 12.0 }),
             },
         );
     }
@@ -427,14 +428,14 @@ mod tests {
 
         assert_eq!(
             expr,
-            Expr::BinOp {
+            Expr::EBinOp {
                 op: Operator::Add,
-                left: Box::new(Expr::Numb { value: 11.12 }),
+                left: Box::new(Expr::ENumb { value: 11.12 }),
                 right: Box::new(
-                    Expr::BinOp {
+                    Expr::EBinOp {
                         op: Operator::Mul,
-                        left: Box::new(Expr::Numb { value: 12.0 }),
-                        right: Box::new(Expr::Numb { value: 3.0 }),
+                        left: Box::new(Expr::ENumb { value: 12.0 }),
+                        right: Box::new(Expr::ENumb { value: 3.0 }),
                     },
                 ),
             },
@@ -470,16 +471,16 @@ mod tests {
 
         assert_eq!(
             expr,
-            Expr::BinOp {
+            Expr::EBinOp {
                 op: Operator::Add,
                 left: Box::new(
-                    Expr::BinOp {
+                    Expr::EBinOp {
                         op: Operator::Mul,
-                        left: Box::new(Expr::Numb { value: 11.12 }),
-                        right: Box::new(Expr::Numb { value: 12.0 }),
+                        left: Box::new(Expr::ENumb { value: 11.12 }),
+                        right: Box::new(Expr::ENumb { value: 12.0 }),
                     },
                 ),
-                right: Box::new(Expr::Numb { value: 3.0 }),
+                right: Box::new(Expr::ENumb { value: 3.0 }),
             },
         );
     }
@@ -515,16 +516,16 @@ mod tests {
 
         assert_eq!(
             expr,
-            Expr::BinOp {
+            Expr::EBinOp {
                 op: Operator::Mul,
-                left: Box::new(Expr::Numb { value: 11.12 }),
+                left: Box::new(Expr::ENumb { value: 11.12 }),
                 right: Box::new(
-                    Expr::Group{
+                    Expr::EGroup{
                         expr: Box::new(
-                            Expr::BinOp {
+                            Expr::EBinOp {
                                 op: Operator::Add,
-                                left: Box::new(Expr::Numb { value: 12.0 }),
-                                right: Box::new(Expr::Numb { value: 3.0 }),
+                                left: Box::new(Expr::ENumb { value: 12.0 }),
+                                right: Box::new(Expr::ENumb { value: 3.0 }),
                             },
                         ),
                     },
