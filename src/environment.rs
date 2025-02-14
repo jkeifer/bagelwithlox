@@ -4,13 +4,14 @@ use std::collections::HashMap;
 use crate::value::LoxValue;
 
 
+#[derive(Debug)]
 pub struct Environment<'a> {
     env: RefCell<HashMap<String, Option<LoxValue>>>,
     parent: Option<&'a Environment<'a>>,
 }
 
 impl<'a> Environment<'a> {
-    pub fn new(parent: Option<&'a Environment>) -> Environment<'a> {
+    pub fn new(parent: Option<&'a Environment<'a>>) -> Environment<'a> {
         Environment {
             env: RefCell::new(HashMap::new()),
             parent,

@@ -8,10 +8,6 @@ use super::tokenizer::{Tokens, Token, TokenType};
 use super::tokenizer::TokenType::*;
 
 
-// TODO: want to make this language expression-oriented
-// some hints of that already in blocks returning values...
-
-
 const PARSE_ERROR: &'static str = "ParseError";
 
 
@@ -45,7 +41,7 @@ impl ParseError {
 }
 
 
-pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
+pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST, ParseError> {
     let mut ast = AST::new();
     let mut token_iter = PrevPeekable::new(tokens.iter());
 
@@ -57,7 +53,7 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
 }
 
 
-pub fn parse_expr<'a>(tokens: &'a Tokens<'a>) -> Result<Expr<'a>, ParseError> {
+pub fn parse_expr<'a>(tokens: &'a Tokens<'a>) -> Result<Expr, ParseError> {
     let mut token_iter = PrevPeekable::new(tokens.iter());
 
     let expr = expression(&mut token_iter)?;
@@ -76,7 +72,7 @@ pub fn parse_expr<'a>(tokens: &'a Tokens<'a>) -> Result<Expr<'a>, ParseError> {
 }
 
 
-fn declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt<'a>, ParseError>>
+fn declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt, ParseError>>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -87,7 +83,7 @@ where
 }
 
 
-fn var_declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn var_declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -106,26 +102,23 @@ where
     };
 
     expect(token_iter, SemiColon)?;
-    Ok(Stmt::SVar{ name: id.lexeme, value: init })
+    Ok(Stmt::SVar{ name: id.lexeme.to_string(), value: init })
 }
 
 
-fn statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt<'a>, ParseError>>
+fn statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt, ParseError>>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
     Some(match token_iter.peek()?.get_type() {
-        For => for_statement(token_iter),
-        If => if_statement(token_iter),
         Print => print_statement(token_iter),
-        While => while_statement(token_iter),
-        LeftBrace => block(token_iter),
+        Equal => assignment_statement(token_iter),
         _ => expression_statement(token_iter),
     })
 }
 
 
-fn _for_initializer<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Option<Stmt<'a>>, ParseError>
+fn _for_initializer<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Option<Stmt>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -152,7 +145,7 @@ where
 }
 
 
-fn _for_condition<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn _for_condition<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -176,13 +169,14 @@ where
         _ => Ok(expression(token_iter)?),
     };
 
+    dbg!(1);
     expect(token_iter, SemiColon)?;
 
     result
 }
 
 
-fn _for_increment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Option<Expr<'a>>, ParseError>
+fn _for_increment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Option<Expr>, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -208,7 +202,7 @@ where
 }
 
 
-fn for_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn for_expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -221,13 +215,13 @@ where
     let mut body = block(token_iter)?;
 
     if let Some(expr) = incr {
-        body = Stmt::SBlock(vec![body, Stmt::SExprStmt(expr)]);
+        body = Expr::EBlock(vec![Stmt::SExprStmt(body), Stmt::SExprStmt(expr)]);
     }
 
-    body = Stmt::SWhile(cond, Box::new(body));
+    body = Expr::EWhile(Box::new(cond), Box::new(body));
 
     if let Some(stmt) = init {
-        body = Stmt::SBlock(vec![stmt, body]);
+        body = Expr::EBlock(vec![stmt, Stmt::SExprStmt(body)]);
     }
 
 
@@ -235,7 +229,7 @@ where
 }
 
 
-fn else_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn else_expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -255,7 +249,7 @@ where
 
     // next should be if or block or it's an error
     match token.get_type() {
-        If => if_statement(token_iter),
+        If => if_expression(token_iter),
         LeftBrace => block(token_iter),
         other => {
             dbg!("boo");
@@ -268,7 +262,7 @@ where
 }
 
 
-fn if_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn if_expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -278,28 +272,29 @@ where
 
     let else_ = match token_iter.peek() {
         Some(token) =>  match token.get_type() {
-            Else => Some(Box::new(else_statement(token_iter)?)),
+            Else => Some(Box::new(else_expression(token_iter)?)),
             _ => None,
         },
         None => None,
     };
 
-    Ok(Stmt::SIf(cond, Box::new(then), else_))
+    Ok(Expr::EIf(Box::new(cond), Box::new(then), else_))
 }
 
 
-fn print_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn print_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
     token_iter.next();
     let expr = expression(token_iter)?;
+    dbg!(2);
     expect(token_iter, SemiColon)?;
     Ok(Stmt::SPrint(expr))
 }
 
 
-fn while_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn while_expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -307,29 +302,29 @@ where
     let cond = expression(token_iter)?;
     let body = block(token_iter)?;
 
-    Ok(Stmt::SWhile(cond, Box::new(body)))
+    Ok(Expr::EWhile(Box::new(cond), Box::new(body)))
 }
 
 
-fn _token_not_a_right_brace<'a, I>(token_iter: &mut PrevPeekable<I>) -> bool
+fn _next_is<'a, I>(token_iter: &mut PrevPeekable<I>, ttype: TokenType) -> bool
 where
     I: Iterator<Item = &'a Token<'a>>
 {
     match token_iter.peek() {
-        Some(token) => return *token.get_type() != RightBrace,
+        Some(token) => return *token.get_type() == ttype,
         None => false,
     }
 }
 
 
-fn block<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn block<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
     expect(token_iter, LeftBrace)?;
     let mut stmts = Stmts::new();
 
-    while _token_not_a_right_brace(token_iter) {
+    while !_next_is(token_iter, RightBrace) {
         match declaration(token_iter) {
             Some(result) => stmts.push(result?),
             None => break,
@@ -337,29 +332,57 @@ where
     }
 
     expect(token_iter, RightBrace)?;
-    Ok(Stmt::SBlock(stmts))
+    Ok(Expr::EBlock(stmts))
 }
 
 
-fn expression_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn expression_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
     let expr = expression(token_iter)?;
-    expect(token_iter, SemiColon)?;
+
+    // consume a semi colon
+    if _next_is(token_iter, SemiColon) {
+        token_iter.next();
+    }
+    //expect(token_iter, SemiColon)?;
     Ok(Stmt::SExprStmt(expr))
 }
 
 
-fn expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
-    assignment(token_iter)
+    // need to make sure we have a next token or it's an error
+    let token = match token_iter.peek() {
+        Some(token) => token,
+        None => return Ok(Expr::ENil),
+    };
+
+    match token.get_type() {
+        For => for_expression(token_iter),
+        If => if_expression(token_iter),
+        While => while_expression(token_iter),
+        LeftBrace => block(token_iter),
+        _ => assignment(token_iter),
+    }
 }
 
 
-fn assignment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn assignment_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+    let stmt = Stmt::SExprStmt(assignment(token_iter)?);
+    expect(token_iter, SemiColon)?;
+    Ok(stmt)
+}
+
+
+fn assignment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -395,7 +418,7 @@ where
 }
 
 
-fn or<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn or<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -425,7 +448,7 @@ where
 }
 
 
-fn and<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn and<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -457,7 +480,7 @@ where
 }
 
 
-fn equality<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn equality<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -488,7 +511,7 @@ where
 }
 
 
-fn comparison<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn comparison<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -517,7 +540,7 @@ where
 }
 
 
-fn term<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn term<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -546,7 +569,7 @@ where
 }
 
 
-fn factor<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn factor<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -575,7 +598,7 @@ where
 }
 
 
-fn unary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn unary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -584,12 +607,51 @@ where
             token_iter.next();
             Ok(Expr::EUnaryOp { op, operand: Box::new(unary(token_iter)?) })
         },
-        None => primary(token_iter),
+        None => call(token_iter),
     }
 }
 
 
-fn _primary<'b, I>(token_iter: &mut PrevPeekable<I>) -> Option<Expr<'b>>
+fn _function_args<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Vec<Expr>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let mut args = Vec::new();
+
+    while !_next_is(token_iter, RightParen) {
+        args.push(expression(token_iter)?);
+        expect(token_iter, Comma)?;
+    }
+
+    // TODO: handle error if too many args?
+    // if args.len() > 255 {
+
+    Ok(args)
+}
+
+
+fn call<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let mut expr = primary(token_iter)?;
+
+    loop {
+        if _next_is(token_iter, LeftParen) {
+            token_iter.next(); // because we know we have left paren
+            let args = _function_args(token_iter)?;
+            expect(token_iter, RightParen)?;
+            expr = Expr::ECall { func: Box::new(expr), args };
+        } else {
+            break
+        }
+    }
+
+    Ok(expr)
+}
+
+
+fn _primary<'b, I>(token_iter: &mut PrevPeekable<I>) -> Option<Expr>
 where
     I: Iterator<Item = &'b Token<'b>>
 {
@@ -603,18 +665,18 @@ where
             _ => None,
         },
         Str => match token.literal {
-            Some(LiteralValue::LString(value)) => Some(Expr::EStr { value }),
+            Some(LiteralValue::LString(value)) => Some(Expr::EStr { value: value.to_string() }),
             _ => None,
         },
         Identifier => {
-            Some(Expr::EVar { name: token.lexeme })
+            Some(Expr::EVar { name: token.lexeme.to_string() })
         },
         _ => None,
     }
 }
 
 
-fn primary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn primary<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
@@ -628,7 +690,7 @@ where
 }
 
 
-fn group<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+fn group<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {

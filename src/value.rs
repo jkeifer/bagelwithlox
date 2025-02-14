@@ -2,15 +2,22 @@ use std::fmt;
 use std::ops::Deref;
 use std::rc::Rc;
 
+use crate::ast::Stmt;
+
+
+pub type Argument = String;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum LoxType {
     VNumb(f64),
     VStr(String),
     VBool(bool),
     VNil,
+    VCallable(String, Vec<Argument>, Box<Stmt>),
 }
 
 use LoxType::*;
+
 
 impl fmt::Display for LoxType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -19,15 +26,16 @@ impl fmt::Display for LoxType {
             VStr(_) => "String",
             VBool(_) => "Bool",
             VNil => "Nil",
+            VCallable(_,_,_) => "Callable",
         })
     }
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LoxValue(Rc<LoxType>);
 
-impl Deref for LoxValue {
+impl<'a> Deref for LoxValue {
     type Target = LoxType;
 
     fn deref(&self) -> &Self::Target {
@@ -46,6 +54,7 @@ impl LoxValue {
             VStr(v) => format!("{}", v),
             VBool(v) => format!("{}", v),
             VNil => "nil".to_string(),
+            VCallable(name, _, _) => format!("{}", name),
         }
     }
 

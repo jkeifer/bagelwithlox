@@ -52,7 +52,7 @@ fn eval_unary_op(
 }
 
 
-pub fn eval(expr: &Expr, env: &Environment) -> Result<LoxValue, String> {
+pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue, String> {
     use Expr::*;
     use LoxType::*;
     match expr {
@@ -86,11 +86,50 @@ pub fn eval(expr: &Expr, env: &Environment) -> Result<LoxValue, String> {
                 &eval(right.as_ref(), env)?,
             )?,)
         },
+        ECall{ func, args } => {
+            let func = eval(func.as_ref(), env)?;
+            let mut arg_vals = Vec::new();
+            for arg in args.iter() {
+                arg_vals.push(eval(arg, env)?);
+            }
+            todo!();
+        },
+        EBlock(statments) => {
+            let env = env.new_child();
+            match statments.split_last() {
+                Some(( last_statement, other_statements)) => {
+                    for stmt in other_statements{
+                        exec(stmt, &env)?;
+                    }
+                    exec(last_statement, &env)
+                },
+                None => Ok(LoxValue::new(LoxType::VNil)),
+            }
+        },
+        EIf(cond, then, else_) => {
+            if eval(cond, &env)?._is_truthy() {
+                return eval(then, &env);
+            }
+
+            if let Some(else_) = else_ {
+                return eval(else_, &env);
+            }
+
+            Ok(LoxValue::new(LoxType::VNil))
+        },
+        EWhile(cond, body) => {
+            while eval(cond, &env)?._is_truthy() {
+                // need to implement break to return a value
+                eval(body, &env)?;
+            }
+
+            Ok(LoxValue::new(LoxType::VNil))
+        },
     }
 }
 
 
-pub fn exec(stmt: &Stmt, env: &Environment) -> Result<LoxValue, String> {
+pub fn exec<'a>(stmt: &Stmt, env: &'a Environment<'a>) -> Result<LoxValue, String> {
     use Stmt::*;
 
     match stmt {
@@ -110,37 +149,6 @@ pub fn exec(stmt: &Stmt, env: &Environment) -> Result<LoxValue, String> {
                 None => Ok(LoxValue::new(LoxType::VNil)),
             }
         },
-        SBlock(statments) => {
-            let env = env.new_child();
-            match statments.split_last() {
-                Some(( last_statement, other_statements)) => {
-                    for stmt in other_statements{
-                        exec(stmt, &env)?;
-                    }
-                    exec(last_statement, &env)
-                },
-                None => Ok(LoxValue::new(LoxType::VNil)),
-            }
-        },
-        SIf(cond, then, else_) => {
-            if eval(cond, &env)?._is_truthy() {
-                return exec(then, &env);
-            }
-
-            if let Some(else_) = else_ {
-                return exec(else_, &env);
-            }
-
-            Ok(LoxValue::new(LoxType::VNil))
-        },
-        SWhile(cond, body) => {
-            while eval(cond, &env)?._is_truthy() {
-                // need to implement break to return a value
-                exec(body, &env)?;
-            }
-
-            Ok(LoxValue::new(LoxType::VNil))
-        },
     }
 }
 
@@ -152,13 +160,13 @@ mod tests {
     use LoxType::*;
 
     fn run_expr(text : &str) -> LoxValue {
-        let mut env = Environment::new(None);
+        let env = Environment::new(None);
         let src = crate::source::Source::from_string(
             text.to_string(),
         );
         let tokens = crate::tokenizer::tokenize(&src).unwrap();
         let expr = crate::parser::parse_expr(&tokens).unwrap();
-        (eval(&expr, &mut env).unwrap()).clone()
+        (eval(&expr, &env).unwrap()).clone()
     }
 
     #[test]

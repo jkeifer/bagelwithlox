@@ -79,21 +79,25 @@ impl Operator {
 }
 
 
-#[derive(Debug, PartialEq)]
-pub enum Expr<'a> {
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expr {
     ENumb{ value: f64 },
-    EStr{ value: &'a str },
+    EStr{ value: String },
     EBool{ value: bool },
     ENil,
-    EBinOp{ op: Operator, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
-    EUnaryOp{ op: Operator, operand: Box<Expr<'a>> },
-    EGroup{ expr: Box<Expr<'a>> },
-    EVar{ name: &'a str },
-    EAssign{ name: &'a str, expr: Box<Expr<'a>>},
-    ELogicalOp{ op: Operator, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
+    EBinOp{ op: Operator, left: Box<Expr>, right: Box<Expr> },
+    EUnaryOp{ op: Operator, operand: Box<Expr> },
+    EGroup{ expr: Box<Expr> },
+    EVar{ name: String },
+    EAssign{ name: String, expr: Box<Expr>},
+    ELogicalOp{ op: Operator, left: Box<Expr>, right: Box<Expr> },
+    ECall{ func: Box<Expr>, args: Vec<Expr> },
+    EBlock(Stmts),
+    EIf(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
+    EWhile(Box<Expr>, Box<Expr>),
 }
 
-impl<'a> fmt::Display for Expr<'a> {
+impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Expr::*;
         write!(f, "{}", match self {
@@ -125,31 +129,36 @@ impl<'a> fmt::Display for Expr<'a> {
                 op,
                 right,
             ),
+            ECall{ func, args } => format!(
+                "{}({:?})",
+                func,
+                args,
+            ),
+            EBlock(statements) => todo!(),
+            EIf(cond, body, else_) => todo!(),
+            EWhile(cond, body) => todo!(),
         })
     }
 }
 
 
-#[derive(Debug, PartialEq)]
-pub enum Stmt<'a> {
-    SPrint(Expr<'a>),
-    SVar{ name: &'a str, value: Option<Expr<'a>> },
-    SExprStmt(Expr<'a>),
-    SBlock(Stmts<'a>),
-    SIf(Expr<'a>, Box<Stmt<'a>>, Option<Box<Stmt<'a>>>),
-    SWhile(Expr<'a>, Box<Stmt<'a>>),
+#[derive(Clone, Debug, PartialEq)]
+pub enum Stmt {
+    SPrint(Expr),
+    SVar{ name: String, value: Option<Expr> },
+    SExprStmt(Expr),
 }
 
-pub type Stmts<'a> = Vec<Stmt<'a>>;
+pub type Stmts = Vec<Stmt>;
 
 
 #[derive(Debug, PartialEq)]
-pub struct AST<'a> {
-    pub top : Stmts<'a>
+pub struct AST {
+    pub top : Stmts
 }
 
-impl<'a> AST<'a> {
-    pub fn new() -> AST<'a> {
+impl AST {
+    pub fn new() -> AST {
         AST { top: vec![] }
     }
 }
