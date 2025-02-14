@@ -7,6 +7,7 @@ pub enum LoxValue {
     VStr(String),
     VBool(bool),
     VNil,
+    VUninitialized,
 }
 
 use LoxValue::*;
@@ -18,6 +19,7 @@ impl fmt::Display for LoxValue {
             VStr(_) => "String",
             VBool(_) => "Bool",
             VNil => "Nil",
+            VUninitialized => "<!>",
         })
     }
 }
@@ -28,7 +30,8 @@ impl LoxValue {
             VNumb(v) => format!("{}", v),
             VStr(v) => format!("{}", v),
             VBool(v) => format!("{}", v),
-            VNil => String::from("nil"),
+            VNil => "nil".to_string(),
+            VUninitialized => "<1>".to_string(),
         }
     }
 

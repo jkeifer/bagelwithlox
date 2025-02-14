@@ -31,12 +31,15 @@ impl<'a> Environment<'a> {
         {
             let env = self.env.borrow();
             if let Some(v) = env.get(name) {
+                if **v == LoxValue::VUninitialized {
+                    return Err("ValueError: variable used before initialization".to_string());
+                }
                 return Ok(Rc::clone(&v));
             };
         }
         match self.parent {
             Some(p) => p.lookup(name),
-            None => Err(format!("{} not declared", name)),
+            None => Err(format!("NameError: {} not declared", name)),
         }
     }
 

@@ -89,7 +89,7 @@ pub fn exec(stmt: &Stmt, env: &Environment) -> Result<Rc<LoxValue>, String> {
             name,
             match value {
                 Some(v) => eval(v, env)?,
-                None => Rc::new(LoxValue::VNil),
+                None => Rc::new(LoxValue::VUninitialized),
             },
         )),
         SBlock(statments) => {
