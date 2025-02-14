@@ -20,9 +20,21 @@ fn eval_bin_op(
         GreaterEqual => left.ge(right),
         Less => left.lt(right),
         LessEqual => left.le(right),
+        _ => Err(format!("Unsupported binary operation: {}", op)),
+    }
+}
+
+
+fn eval_logical_op(
+    op: &Operator,
+    left: &LoxValue,
+    right: &LoxValue,
+) -> Result<LoxValue, String> {
+    use Operator::*;
+    match op {
         And => left.and(right),
         Or => left.or(right),
-        _ => Err(format!("Unsupported binary operation: {}", op)),
+        _ => Err(format!("Unsupported logical operation: {}", op)),
     }
 }
 
@@ -67,6 +79,13 @@ pub fn eval(expr: &Expr, env: &Environment) -> Result<LoxValue, String> {
             name,
             eval(expr.as_ref(), env)?,
         ),
+        ELogicalOp { op, left, right } => {
+            Ok(eval_logical_op(
+                &op,
+                &eval(left.as_ref(), env)?,
+                &eval(right.as_ref(), env)?,
+            )?,)
+        },
     }
 }
 
@@ -102,6 +121,25 @@ pub fn exec(stmt: &Stmt, env: &Environment) -> Result<LoxValue, String> {
                 },
                 None => Ok(LoxValue::new(LoxType::VNil)),
             }
+        },
+        SIf(cond, then, else_) => {
+            if eval(cond, &env)?._is_truthy() {
+                return exec(then, &env);
+            }
+
+            if let Some(else_) = else_ {
+                return exec(else_, &env);
+            }
+
+            Ok(LoxValue::new(LoxType::VNil))
+        },
+        SWhile(cond, body) => {
+            while eval(cond, &env)?._is_truthy() {
+                // need to implement break to return a value
+                exec(body, &env)?;
+            }
+
+            Ok(LoxValue::new(LoxType::VNil))
         },
     }
 }

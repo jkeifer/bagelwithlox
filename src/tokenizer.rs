@@ -322,7 +322,8 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, TokenizeError> {
                         end = ch_idxs.next_index().unwrap_or(_end);
                     };
                     pos.length += end - start;
-                    Token::new(Comment, pos, &src.content[start..=end])
+                    //Token::new(Comment, pos, &src.content[start..=end])
+                    continue;
                 },
                 None =>Token::new(Slash, pos, "/"),
             },

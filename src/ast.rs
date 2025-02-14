@@ -54,8 +54,6 @@ impl Operator {
             | GreaterEqual
             | Less
             | LessEqual
-            | And
-            | Or
                 => true,
             _ => false,
         }
@@ -65,6 +63,16 @@ impl Operator {
         use Operator::*;
         match self {
             Not | Negate => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_logical_operator(&self) -> bool {
+        use Operator::*;
+        match self {
+            And
+            | Or
+                => true,
             _ => false,
         }
     }
@@ -82,6 +90,7 @@ pub enum Expr<'a> {
     EGroup{ expr: Box<Expr<'a>> },
     EVar{ name: &'a str },
     EAssign{ name: &'a str, expr: Box<Expr<'a>>},
+    ELogicalOp{ op: Operator, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
 }
 
 impl<'a> fmt::Display for Expr<'a> {
@@ -110,6 +119,12 @@ impl<'a> fmt::Display for Expr<'a> {
                 name,
                 expr,
             ),
+            ELogicalOp{ op, left, right} => format!(
+                "({} {} {})",
+                left,
+                op,
+                right,
+            ),
         })
     }
 }
@@ -121,6 +136,8 @@ pub enum Stmt<'a> {
     SVar{ name: &'a str, value: Option<Expr<'a>> },
     SExprStmt(Expr<'a>),
     SBlock(Stmts<'a>),
+    SIf(Expr<'a>, Box<Stmt<'a>>, Option<Box<Stmt<'a>>>),
+    SWhile(Expr<'a>, Box<Stmt<'a>>),
 }
 
 pub type Stmts<'a> = Vec<Stmt<'a>>;

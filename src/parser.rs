@@ -8,6 +8,10 @@ use super::tokenizer::{Tokens, Token, TokenType};
 use super::tokenizer::TokenType::*;
 
 
+// TODO: want to make this language expression-oriented
+// some hints of that already in blocks returning values...
+
+
 const PARSE_ERROR: &'static str = "ParseError";
 
 
@@ -76,14 +80,9 @@ fn declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt<'a
 where
     I: Iterator<Item = &'a Token<'a>>
 {
-    let token = match token_iter.peek() {
-        Some(t) => t,
-        None => return None,
-    };
-
-    match token.get_type() {
+    match token_iter.peek()?.get_type() {
         Var => Some(var_declaration(token_iter)),
-        _ => Some(statement(token, token_iter)),
+        _ => statement(token_iter),
     }
 }
 
@@ -111,15 +110,70 @@ where
 }
 
 
-fn statement<'a, I>(token: &'a Token, token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt<'a>, ParseError>>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
-    match token.get_type() {
+    Some(match token_iter.peek()?.get_type() {
+        If => if_statement(token_iter),
         Print => print_statement(token_iter),
+        While => while_statement(token_iter),
         LeftBrace => block(token_iter),
         _ => expression_statement(token_iter),
+    })
+}
+
+
+fn else_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next(); // should already have matched else
+
+    // need to make sure we have a next token or it's an error
+    let token = match token_iter.peek() {
+        Some(token) => token,
+        None => {
+            let last = token_iter.prev().unwrap();
+            return Err(ParseError::new(
+                last.get_position(),
+                "expected if or code block after else".to_string(),
+            ));
+        },
+    };
+
+    // next should be if or block or it's an error
+    match token.get_type() {
+        If => if_statement(token_iter),
+        LeftBrace => block(token_iter),
+        other => {
+            dbg!("boo");
+            return Err(ParseError::new(
+            token.pos,
+            format!("expected if or code block after else, found {}", other),
+        ));
+        },
     }
+}
+
+
+fn if_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+    let cond = expression(token_iter)?;
+    let then = block(token_iter)?;
+
+    let else_ = match token_iter.peek() {
+        Some(token) =>  match token.get_type() {
+            Else => Some(Box::new(else_statement(token_iter)?)),
+            _ => None,
+        },
+        None => None,
+    };
+
+    Ok(Stmt::SIf(cond, Box::new(then), else_))
 }
 
 
@@ -131,6 +185,18 @@ where
     let expr = expression(token_iter)?;
     expect(token_iter, SemiColon)?;
     Ok(Stmt::SPrint(expr))
+}
+
+
+fn while_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+    let cond = expression(token_iter)?;
+    let body = block(token_iter)?;
+
+    Ok(Stmt::SWhile(cond, Box::new(body)))
 }
 
 
@@ -149,7 +215,7 @@ fn block<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError
 where
     I: Iterator<Item = &'a Token<'a>>
 {
-    token_iter.next();
+    expect(token_iter, LeftBrace)?;
     let mut stmts = Stmts::new();
 
     while _token_not_a_right_brace(token_iter) {
@@ -186,7 +252,7 @@ fn assignment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, Parse
 where
     I: Iterator<Item = &'a Token<'a>>
 {
-    let expr = equality(token_iter)?;
+    let expr = or(token_iter)?;
 
     let token = match token_iter.peek() {
         Some(v) => v,
@@ -204,6 +270,66 @@ where
         )),
         (expr, _) => Ok(expr),
     }
+}
+
+
+fn _is_or<'a, I>(token_iter: &mut PrevPeekable<I>) -> bool
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    match token_iter.peek() {
+        Some(token) => *token.get_type() == Or,
+        None => false,
+    }
+}
+
+
+fn or<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let mut expr = and(token_iter)?;
+
+    while _is_or(token_iter) {
+        token_iter.next();
+        expr = Expr::ELogicalOp {
+            op: Operator::Or,
+            left: Box::new(expr),
+            right: Box::new(and(token_iter)?)
+        };
+    }
+
+    Ok(expr)
+}
+
+
+fn _is_and<'a, I>(token_iter: &mut PrevPeekable<I>) -> bool
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    match token_iter.peek() {
+        Some(token) => *token.get_type() == And,
+        None => false,
+    }
+}
+
+
+fn and<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let mut expr = equality(token_iter)?;
+
+    while _is_and(token_iter) {
+        token_iter.next();
+        expr = Expr::ELogicalOp {
+            op: Operator::And,
+            left: Box::new(expr),
+            right: Box::new(equality(token_iter)?)
+        };
+    }
+
+    Ok(expr)
 }
 
 
@@ -424,6 +550,7 @@ where
 }
 
 
+// TODO: this erorr message approach falls apart with statements...
 fn expect<'a, 'b, I>(
     token_iter: &mut PrevPeekable<I>,
     ttype: TokenType,
