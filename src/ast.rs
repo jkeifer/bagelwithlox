@@ -7,7 +7,6 @@ pub enum Operator {
     Add,
     Mul,
     Div,
-    Assign,
     NotEqual,
     Equal,
     Greater,
@@ -28,7 +27,6 @@ impl fmt::Display for Operator {
             Add => "+",
             Mul => "*",
             Div => "/",
-            Assign => "=",
             NotEqual => "!=",
             Equal => "=",
             Greater => ">",
@@ -50,7 +48,6 @@ impl Operator {
             | Add
             | Mul
             | Div
-            | Assign
             | NotEqual
             | Equal
             | Greater

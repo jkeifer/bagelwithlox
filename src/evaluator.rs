@@ -1,4 +1,5 @@
-use super::ast::{Expr, Operator};
+use std::rc::Rc;
+use super::ast::{Expr, Operator, Stmt};
 use super::environment::Environment;
 use super::value::LoxValue;
 
@@ -7,7 +8,6 @@ fn eval_bin_op(
     op: &Operator,
     left: &LoxValue,
     right: &LoxValue,
-    env: &mut Environment,
 ) -> Result<LoxValue, String> {
     use Operator::*;
     match op {
@@ -15,11 +15,6 @@ fn eval_bin_op(
         Add => left.add(right),
         Mul => left.mul(right),
         Div => left.div(right),
-        Assign => {
-            // TODO: env insert
-            //env.insert(left, right);
-            Ok(right.clone())
-        },
         NotEqual => left.neq(right),
         Equal => left.eq( right),
         Greater => left.gt(right),
@@ -46,31 +41,57 @@ fn eval_unary_op(
 }
 
 
-pub fn eval(expr: &Expr,  env: &mut Environment) -> Result<LoxValue, String> {
+pub fn eval(expr: &Expr, env: &Environment) -> Result<Rc<LoxValue>, String> {
     use Expr::*;
     use LoxValue::*;
     match expr {
-        ENumb { value } => Ok(VNumb(*value)),
-        EStr { value } => Ok(VStr(value.to_string())),
-        EBool { value } => Ok(VBool(*value)),
-        ENil => Ok(VNil),
+        ENumb { value } => Ok(Rc::new(VNumb(*value))),
+        EStr { value } => Ok(Rc::new(VStr(value.to_string()))),
+        EBool { value } => Ok(Rc::new(VBool(*value))),
+        ENil => Ok(Rc::new(VNil)),
         EBinOp { op, left, right } => {
-            eval_bin_op(
+            Ok(Rc::new(
+                eval_bin_op(
                     &op,
-                      &eval(left.as_ref(), env)?,
-                       &eval(right.as_ref(), env)?,
-                     env,
-            )
+                    &*eval(left.as_ref(), env)?,
+                    &*eval(right.as_ref(), env)?,
+                )?,
+            ))
         },
         EUnaryOp { op, operand } => {
-            eval_unary_op(
-                &op,
-                &eval(operand.as_ref(), env)?,
-            )
+            Ok(Rc::new(
+                eval_unary_op(
+                    &op,
+                    &*eval(operand.as_ref(), env)?,
+                )?,
+            ))
         },
         EGroup { expr } => eval(expr.as_ref(), env),
-        EVar { name } => todo!(),
-        EAssign { name, expr } => todo!(),
+        EVar { name } => env.lookup( name ),
+        EAssign { name, expr } => env.assign(
+            name,
+            eval(expr.as_ref(), env)?,
+        ),
+    }
+}
+
+
+pub fn exec(stmt: &Stmt, env: &Environment) -> Result<Rc<LoxValue>, String> {
+    use Stmt::*;
+
+    match stmt {
+        SPrint(expr) => {
+            println!("{}", eval(expr, env)?.value_string());
+            Ok(Rc::new(LoxValue::VNil))
+        },
+        SExprStmt(expr) => eval(expr, env),
+        SVar{ name, value } => Ok(env.var(
+            name,
+            match value {
+                Some(v) => eval(v, env)?,
+                None => Rc::new(LoxValue::VNil),
+            },
+        )),
     }
 }
 
@@ -82,13 +103,13 @@ mod tests {
     use LoxValue::*;
 
     fn run_expr(text : &str) -> LoxValue {
-        let mut env = Environment::new();
+        let mut env = Environment::new(None);
         let src = crate::source::Source::from_string(
             text.to_string(),
         );
         let tokens = crate::tokenizer::tokenize(&src).unwrap();
         let expr = crate::parser::parse_expr(&tokens).unwrap();
-        eval(&expr, &mut env).unwrap()
+        (*eval(&expr, &mut env).unwrap()).clone()
     }
 
     #[test]

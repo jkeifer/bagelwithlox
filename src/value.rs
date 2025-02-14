@@ -71,7 +71,7 @@ impl LoxValue {
         match (self, b) {
             (VNumb(a), VNumb(b)) => Ok(VNumb(a + b)),
             (VStr(a), VStr(b)) => Ok(VStr(a.to_string() + &b)),
-            (a, b) => Err(format!("Cannot add {} from {}", a, b)),
+            (a, b) => Err(format!("Cannot add {} to {}", a, b)),
         }
     }
 
@@ -80,14 +80,14 @@ impl LoxValue {
             (VNumb(a), VNumb(b)) => Ok(VNumb(a * b)),
             (VStr(a), VNumb(b)) => Ok(VStr(a.repeat(*b as usize))),
             (VNumb(a), VStr(b)) => Ok(VStr(b.repeat(*a as usize))),
-            (a, b) => Err(format!("Cannot multiply {} from {}", a, b)),
+            (a, b) => Err(format!("Cannot multiply {} by {}", a, b)),
         }
     }
 
     pub fn div(&self, b: &LoxValue) -> Result<LoxValue, String> {
         match (self, b) {
             (VNumb(a), VNumb(b)) => Ok(VNumb(a / b)),
-            (a, b) => Err(format!("Cannot divide {} from {}", a, b)),
+            (a, b) => Err(format!("Cannot divide {} by {}", a, b)),
         }
     }
 

@@ -381,12 +381,12 @@ pub fn tokenize<'a>(src: &'a Source) -> Result<Tokens<'a>, TokenizeError> {
 
             // Identifier or keyword
             _ if ch.is_alphabetic() || ch == '_' => {
-                let mut end = ch_idxs.next_index().unwrap_or(src.content.len()+1);
+                let mut end = ch_idxs.next_index().unwrap_or(src.content.len());
 
                 while let Some((_end, _)) = ch_idxs.next_if(
                     |&(_, ch)| ch.is_alphanumeric() || ch == '_',
                 ) {
-                    end = ch_idxs.next_index().unwrap_or(_end+1);
+                    end = ch_idxs.next_index().unwrap_or(_end + 1);
                 }
 
                 let lexeme = &src.content[start..end];
@@ -602,6 +602,19 @@ mod tests {
                     LiteralValue::LNumber(11.12),
                 ),
                 //Token::new(Eof, FilePosition::nwl(2, 32, 0)),
+            ],
+        );
+    }
+
+    #[test]
+    fn test_x() {
+        let tstr = "x";
+        let source = Source::from_string(tstr.to_string());
+        let tokens = tokenize(&source).unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Identifier, FilePosition::nwl(1, 1, 1), "x"),
             ],
         );
     }

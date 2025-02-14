@@ -1,25 +1,27 @@
-use crate::ast::Stmt;
+use std::rc::Rc;
+
 use crate::parser::parse_expr;
 use crate::tokenizer::Tokens;
+use crate::value::LoxValue;
 
 use super::source::Source;
 use super::environment::Environment;
 use super::parser::parse;
-use super::evaluator::eval;
+use super::evaluator::{eval, exec};
 use super::tokenizer::tokenize;
 
-pub struct Interpreter {
-    env: Environment,
+pub struct Interpreter<'a> {
+    env: Environment<'a>,
 }
 
-impl Interpreter {
-    pub fn new() -> Interpreter {
+impl<'a> Interpreter<'a> {
+    pub fn new() -> Interpreter<'a> {
         Interpreter{
-            env: Environment::new(),
+            env: Environment::new(None),
         }
     }
 
-    pub fn interpret(&mut self, src: &mut Source) -> Result<Option<String>, String> {
+    pub fn interpret<'b>(&mut self, src: &'b mut Source) -> Result<Option<String>, String> {
         let tokens = match tokenize(src) {
             Ok(v) => v,
             Err(e) => {
@@ -28,8 +30,11 @@ impl Interpreter {
         };
 
         // TODO: only do this in repl
-        if let Ok(v) = self.interpret_expression(src, &tokens) {
-            return Ok(Some(v));
+        if let Ok(result) = self.interpret_expression(src, &tokens) {
+            match result {
+                Ok(v) => return Ok(Some(v.value_string())),
+                Err(e) => return Err(e),
+            }
         }
 
         match self.interpret_statement(src, &tokens) {
@@ -38,7 +43,11 @@ impl Interpreter {
         }
     }
 
-    fn interpret_expression(&mut self, src: &Source, tokens: &Tokens) -> Result<String, String> {
+    fn interpret_expression<'b>(
+        &self,
+        src: &Source,
+        tokens: &'b Tokens,
+    ) -> Result<Result<Rc<LoxValue>, String>, String> {
         let expr = match parse_expr(&tokens) {
             Ok(v) => v,
             Err(e) => {
@@ -46,10 +55,10 @@ impl Interpreter {
             },
         };
 
-        Ok(eval(&expr, &mut self.env)?.value_string())
+        Ok(eval(&expr, &self.env))
     }
 
-    fn interpret_statement(&mut self, src: &Source, tokens: &Tokens) -> Result<(), String> {
+    fn interpret_statement<'b>(&self, src: &Source, tokens: &'b Tokens) -> Result<(), String> {
         let ast = match parse(&tokens) {
             Ok(v) => v,
             Err(e) => {
@@ -58,27 +67,12 @@ impl Interpreter {
         };
 
         for statement in ast.top {
-            self.execute(&statement)?;
+            exec(&statement, &self.env)?;
         }
 
         Ok(())
     }
 
-    fn execute<'a>(&mut self, stmt: &Stmt<'a>) -> Result<(), String> {
-        use Stmt::*;
-
-        match stmt {
-            SPrint(expr) => {
-                println!("{}", eval(expr, &mut self.env)?.value_string());
-                Ok(())
-            },
-            SVar{ name, value } => Ok(()),
-            SExprStmt(expr) => {
-                eval(expr, &mut self.env)?;
-                Ok(())
-            },
-        }
-    }
 }
 
 

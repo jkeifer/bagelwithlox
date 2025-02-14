@@ -91,7 +91,10 @@ where
     let id = expect(token_iter, Identifier)?;
     let init = match token_iter.peek() {
         Some(token) => match token.get_type() {
-            Equal => Some(expression(token_iter)?),
+            Equal => {
+                token_iter.next();
+                Some(expression(token_iter)?)
+            },
             _ => None,
         },
         None => None,
@@ -138,7 +141,32 @@ fn expression<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, Parse
 where
     I: Iterator<Item = &'a Token<'a>>
 {
-    equality(token_iter)
+    assignment(token_iter)
+}
+
+
+fn assignment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let expr = equality(token_iter)?;
+
+    let token = match token_iter.peek() {
+        Some(v) => v,
+        None => return Ok(expr),
+    };
+
+    match (expr, token.get_type()) {
+        (Expr::EVar { name }, Equal) => {
+            token_iter.next();
+            Ok(Expr::EAssign { name, expr: Box::new(assignment(token_iter)?) })
+        },
+        (_, Equal) => Err(ParseError::new(
+            token.pos,
+            "Invalid assignment target".to_string(),
+        )),
+        (expr, _) => Ok(expr),
+    }
 }
 
 
@@ -304,7 +332,9 @@ where
             Some(LiteralValue::LString(value)) => Some(Expr::EStr { value }),
             _ => None,
         },
-        Identifier => Some(Expr::EVar { name: token.lexeme }),
+        Identifier => {
+            Some(Expr::EVar { name: token.lexeme })
+        },
         _ => None,
     }
 }
@@ -385,10 +415,12 @@ where
 
     // We have to get next first so prev is the last token.
     // In other words we can't see current without making it prev.
-    match (token_iter.next(), token_iter.prev_peek()) {
-        (Some(token), _) if *token.get_type() == ttype => Ok(token),
-        (None, Some(token)) => make_err(Some(token)),
-        (Some(token), _) => make_err(Some(token)),
+    let next = token_iter.next();
+    let prev = token_iter.prev_peek();
+    match (prev, next) {
+        (_, Some(token)) if *token.get_type() == ttype => Ok(token),
+        (Some(token), None) => make_err(Some(token)),
+        (_, Some(token)) => make_err(Some(token)),
         (None, None) => make_err(None),
     }
 }
