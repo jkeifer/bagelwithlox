@@ -1,4 +1,5 @@
 use prev_iter::PrevPeekable;
+use crate::ast::Stmts;
 use crate::source::FilePosition;
 use crate::tokenizer::LiteralValue;
 use super::source::SourceError;
@@ -44,8 +45,8 @@ pub fn parse<'a>(tokens: &'a Tokens<'a>) -> Result<AST<'a>, ParseError> {
     let mut ast = AST::new();
     let mut token_iter = PrevPeekable::new(tokens.iter());
 
-    while let Some(token) = token_iter.peek() {
-        ast.top.push(declaration(token, &mut token_iter)?);
+    while let Some(result) = declaration(&mut token_iter) {
+        ast.top.push(result?);
     }
 
     Ok(ast)
@@ -71,13 +72,18 @@ pub fn parse_expr<'a>(tokens: &'a Tokens<'a>) -> Result<Expr<'a>, ParseError> {
 }
 
 
-fn declaration<'a, I>(token: &'a Token, token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+fn declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Option<Result<Stmt<'a>, ParseError>>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
+    let token = match token_iter.peek() {
+        Some(t) => t,
+        None => return None,
+    };
+
     match token.get_type() {
-        Var => var_declaration(token_iter),
-        _ => statement(token, token_iter),
+        Var => Some(var_declaration(token_iter)),
+        _ => Some(statement(token, token_iter)),
     }
 }
 
@@ -111,6 +117,7 @@ where
 {
     match token.get_type() {
         Print => print_statement(token_iter),
+        LeftBrace => block(token_iter),
         _ => expression_statement(token_iter),
     }
 }
@@ -124,6 +131,36 @@ where
     let expr = expression(token_iter)?;
     expect(token_iter, SemiColon)?;
     Ok(Stmt::SPrint(expr))
+}
+
+
+fn _token_not_a_right_brace<'a, I>(token_iter: &mut PrevPeekable<I>) -> bool
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    match token_iter.peek() {
+        Some(token) => return *token.get_type() != RightBrace,
+        None => false,
+    }
+}
+
+
+fn block<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+    let mut stmts = Stmts::new();
+
+    while _token_not_a_right_brace(token_iter) {
+        match declaration(token_iter) {
+            Some(result) => stmts.push(result?),
+            None => break,
+        };
+    }
+
+    expect(token_iter, RightBrace)?;
+    Ok(Stmt::SBlock(stmts))
 }
 
 

@@ -120,6 +120,7 @@ pub enum Stmt<'a> {
     SPrint(Expr<'a>),
     SVar{ name: &'a str, value: Option<Expr<'a>> },
     SExprStmt(Expr<'a>),
+    SBlock(Stmts<'a>),
 }
 
 pub type Stmts<'a> = Vec<Stmt<'a>>;

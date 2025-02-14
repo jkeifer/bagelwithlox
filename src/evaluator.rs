@@ -92,6 +92,18 @@ pub fn exec(stmt: &Stmt, env: &Environment) -> Result<Rc<LoxValue>, String> {
                 None => Rc::new(LoxValue::VNil),
             },
         )),
+        SBlock(statments) => {
+            let env = env.new_child();
+            match statments.split_last() {
+                Some(( last_statement, other_statements)) => {
+                    for stmt in other_statements{
+                        exec(stmt, &env)?;
+                    }
+                    exec(last_statement, &env)
+                },
+                None => Ok(Rc::new(LoxValue::VNil)),
+            }
+        },
     }
 }
 
