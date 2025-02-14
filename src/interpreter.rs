@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::parser::parse_expr;
 use crate::tokenizer::Tokens;
 use crate::value::LoxValue;
@@ -47,7 +45,7 @@ impl<'a> Interpreter<'a> {
         &self,
         src: &Source,
         tokens: &'b Tokens,
-    ) -> Result<Result<Rc<LoxValue>, String>, String> {
+    ) -> Result<Result<LoxValue, String>, String> {
         let expr = match parse_expr(&tokens) {
             Ok(v) => v,
             Err(e) => {

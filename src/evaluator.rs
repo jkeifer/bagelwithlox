@@ -1,7 +1,6 @@
-use std::rc::Rc;
 use super::ast::{Expr, Operator, Stmt};
 use super::environment::Environment;
-use super::value::LoxValue;
+use super::value::{LoxValue, LoxType};
 
 
 fn eval_bin_op(
@@ -41,30 +40,26 @@ fn eval_unary_op(
 }
 
 
-pub fn eval(expr: &Expr, env: &Environment) -> Result<Rc<LoxValue>, String> {
+pub fn eval(expr: &Expr, env: &Environment) -> Result<LoxValue, String> {
     use Expr::*;
-    use LoxValue::*;
+    use LoxType::*;
     match expr {
-        ENumb { value } => Ok(Rc::new(VNumb(*value))),
-        EStr { value } => Ok(Rc::new(VStr(value.to_string()))),
-        EBool { value } => Ok(Rc::new(VBool(*value))),
-        ENil => Ok(Rc::new(VNil)),
+        ENumb { value } => Ok(LoxValue::new(VNumb(*value))),
+        EStr { value } => Ok(LoxValue::new(VStr(value.to_string()))),
+        EBool { value } => Ok(LoxValue::new(VBool(*value))),
+        ENil => Ok(LoxValue::new(VNil)),
         EBinOp { op, left, right } => {
-            Ok(Rc::new(
-                eval_bin_op(
-                    &op,
-                    &*eval(left.as_ref(), env)?,
-                    &*eval(right.as_ref(), env)?,
-                )?,
-            ))
+            Ok(eval_bin_op(
+                &op,
+                &eval(left.as_ref(), env)?,
+                &eval(right.as_ref(), env)?,
+            )?,)
         },
         EUnaryOp { op, operand } => {
-            Ok(Rc::new(
-                eval_unary_op(
-                    &op,
-                    &*eval(operand.as_ref(), env)?,
-                )?,
-            ))
+            Ok(eval_unary_op(
+                &op,
+                &eval(operand.as_ref(), env)?,
+            )?,)
         },
         EGroup { expr } => eval(expr.as_ref(), env),
         EVar { name } => env.lookup( name ),
@@ -76,22 +71,26 @@ pub fn eval(expr: &Expr, env: &Environment) -> Result<Rc<LoxValue>, String> {
 }
 
 
-pub fn exec(stmt: &Stmt, env: &Environment) -> Result<Rc<LoxValue>, String> {
+pub fn exec(stmt: &Stmt, env: &Environment) -> Result<LoxValue, String> {
     use Stmt::*;
 
     match stmt {
         SPrint(expr) => {
             println!("{}", eval(expr, env)?.value_string());
-            Ok(Rc::new(LoxValue::VNil))
+            Ok(LoxValue::new(LoxType::VNil))
         },
         SExprStmt(expr) => eval(expr, env),
-        SVar{ name, value } => Ok(env.var(
-            name,
-            match value {
-                Some(v) => eval(v, env)?,
-                None => Rc::new(LoxValue::VUninitialized),
-            },
-        )),
+        SVar{ name, value } => {
+            let value = match value {
+                Some(v) => Some(eval(v, env)?),
+                None => None,
+
+            };
+            match env.var(name, value) {
+                Some(v) => Ok(v),
+                None => Ok(LoxValue::new(LoxType::VNil)),
+            }
+        },
         SBlock(statments) => {
             let env = env.new_child();
             match statments.split_last() {
@@ -101,7 +100,7 @@ pub fn exec(stmt: &Stmt, env: &Environment) -> Result<Rc<LoxValue>, String> {
                     }
                     exec(last_statement, &env)
                 },
-                None => Ok(Rc::new(LoxValue::VNil)),
+                None => Ok(LoxValue::new(LoxType::VNil)),
             }
         },
     }
@@ -112,7 +111,7 @@ pub fn exec(stmt: &Stmt, env: &Environment) -> Result<Rc<LoxValue>, String> {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use LoxValue::*;
+    use LoxType::*;
 
     fn run_expr(text : &str) -> LoxValue {
         let mut env = Environment::new(None);
@@ -121,47 +120,47 @@ mod tests {
         );
         let tokens = crate::tokenizer::tokenize(&src).unwrap();
         let expr = crate::parser::parse_expr(&tokens).unwrap();
-        (*eval(&expr, &mut env).unwrap()).clone()
+        (eval(&expr, &mut env).unwrap()).clone()
     }
 
     #[test]
     fn literals() {
-        assert_eq!(run_expr("2"), VNumb(2.0));
-        assert_eq!(run_expr("true"), VBool(true));
-        assert_eq!(run_expr("false"), VBool(false));
-        assert_eq!(run_expr("nil"), VNil);
-        assert_eq!(run_expr("\"hello\""), VStr(String::from("hello")));
+        assert_eq!(*run_expr("2"), VNumb(2.0));
+        assert_eq!(*run_expr("true"), VBool(true));
+        assert_eq!(*run_expr("false"), VBool(false));
+        assert_eq!(*run_expr("nil"), VNil);
+        assert_eq!(*run_expr("\"hello\""), VStr(String::from("hello")));
     }
 
     #[test]
     fn binops() {
-        assert_eq!(run_expr("2+3"), VNumb(5.0));
-        assert_eq!(run_expr("2*3"), VNumb(6.0));
-        assert_eq!(run_expr("2-3"), VNumb(-1.0));
-        assert_eq!(run_expr("3/2"), VNumb(1.5));
-        assert_eq!(run_expr("\"hello\"+\"world\""), VStr(String::from("helloworld")));
+        assert_eq!(*run_expr("2+3"), VNumb(5.0));
+        assert_eq!(*run_expr("2*3"), VNumb(6.0));
+        assert_eq!(*run_expr("2-3"), VNumb(-1.0));
+        assert_eq!(*run_expr("3/2"), VNumb(1.5));
+        assert_eq!(*run_expr("\"hello\"+\"world\""), VStr(String::from("helloworld")));
     }
 
     #[test]
     fn compare() {
-        assert_eq!(run_expr("2<3"), VBool(true));
-        assert_eq!(run_expr("3<=3"), VBool(true));
-        assert_eq!(run_expr("2>3"), VBool(false));
-        assert_eq!(run_expr("3>=3"), VBool(true));
-        assert_eq!(run_expr("3==3"), VBool(true));
-        assert_eq!(run_expr("3!=3"), VBool(false));
-        assert_eq!(run_expr("\"x\" == \"x\""), VBool(true));
+        assert_eq!(*run_expr("2<3"), VBool(true));
+        assert_eq!(*run_expr("3<=3"), VBool(true));
+        assert_eq!(*run_expr("2>3"), VBool(false));
+        assert_eq!(*run_expr("3>=3"), VBool(true));
+        assert_eq!(*run_expr("3==3"), VBool(true));
+        assert_eq!(*run_expr("3!=3"), VBool(false));
+        assert_eq!(*run_expr("\"x\" == \"x\""), VBool(true));
     }
 
     #[test]
     fn group() {
-        assert_eq!(run_expr("2 + (3*4)"), VNumb(14.0));
+        assert_eq!(*run_expr("2 + (3*4)"), VNumb(14.0));
     }
 
     #[test]
     fn unary() {
-        assert_eq!(run_expr("-3 + 4"), VNumb(1.0));
-        assert_eq!(run_expr("!true"), VBool(false));
-        assert_eq!(run_expr("!123"), VBool(false));
+        assert_eq!(*run_expr("-3 + 4"), VNumb(1.0));
+        assert_eq!(*run_expr("!true"), VBool(false));
+        assert_eq!(*run_expr("!123"), VBool(false));
     }
 }
