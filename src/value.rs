@@ -2,48 +2,49 @@ use std::fmt;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use crate::ast::Stmt;
+use crate::ast::Expr;
+use crate::environment::Environment;
 
 
 pub type Argument = String;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum LoxType {
+pub enum LoxType<'a> {
     VNumb(f64),
     VStr(String),
     VBool(bool),
     VNil,
-    VCallable(String, Vec<Argument>, Box<Stmt>),
+    VCallable(String, Vec<Argument>, Box<Expr>, Box<Environment<'a>>),
 }
 
 use LoxType::*;
 
 
-impl fmt::Display for LoxType {
+impl<'a> fmt::Display for LoxType<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", match self {
             VNumb(_) => "Number",
             VStr(_) => "String",
             VBool(_) => "Bool",
             VNil => "Nil",
-            VCallable(_,_,_) => "Callable",
+            VCallable(_,_,_,_) => "Callable",
         })
     }
 }
 
 
-#[derive(Clone, Debug)]
-pub struct LoxValue(Rc<LoxType>);
+#[derive(Clone, Debug, PartialEq)]
+pub struct LoxValue<'a>(Rc<LoxType<'a>>);
 
-impl<'a> Deref for LoxValue {
-    type Target = LoxType;
+impl<'a> Deref for LoxValue<'a> {
+    type Target = LoxType<'a>;
 
     fn deref(&self) -> &Self::Target {
         &*self.0
     }
 }
 
-impl LoxValue {
+impl<'a, 'b> LoxValue<'a> {
     pub fn new(t: LoxType) -> LoxValue {
         LoxValue(Rc::new(t))
     }
@@ -54,7 +55,7 @@ impl LoxValue {
             VStr(v) => format!("{}", v),
             VBool(v) => format!("{}", v),
             VNil => "nil".to_string(),
-            VCallable(name, _, _) => format!("{}", name),
+            VCallable(name, _, _, _) => format!("{}", name),
         }
     }
 
@@ -72,7 +73,7 @@ impl LoxValue {
         }
     }
 
-    pub fn not(&self) -> Result<LoxValue, String> {
+    pub fn not(&self) -> Result<LoxValue<'b>, String> {
         match &**self {
             VBool(v) => Ok(LoxValue::new(VBool(!v))),
             _ => self.is_truthy().not(),

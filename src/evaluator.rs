@@ -3,11 +3,11 @@ use super::environment::Environment;
 use super::value::{LoxValue, LoxType};
 
 
-fn eval_bin_op(
+fn eval_bin_op<'a>(
     op: &Operator,
-    left: &LoxValue,
-    right: &LoxValue,
-) -> Result<LoxValue, String> {
+    left: &'a LoxValue,
+    right: &'a LoxValue,
+) -> Result<LoxValue<'a>, String> {
     use Operator::*;
     match op {
         Sub => left.sub(right),
@@ -25,11 +25,11 @@ fn eval_bin_op(
 }
 
 
-fn eval_logical_op(
+fn eval_logical_op<'a>(
     op: &Operator,
-    left: &LoxValue,
-    right: &LoxValue,
-) -> Result<LoxValue, String> {
+    left: &'a LoxValue,
+    right: &'a LoxValue,
+) -> Result<LoxValue<'a>, String> {
     use Operator::*;
     match op {
         And => left.and(right),
@@ -39,10 +39,10 @@ fn eval_logical_op(
 }
 
 
-fn eval_unary_op(
+fn eval_unary_op<'a>(
     op: &Operator,
-    operand: &LoxValue,
-) -> Result<LoxValue, String> {
+    operand: &'a LoxValue,
+) -> Result<LoxValue<'a>, String> {
     use Operator::*;
     match op {
         Not => operand.not(),
@@ -52,7 +52,7 @@ fn eval_unary_op(
 }
 
 
-pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue, String> {
+pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue<'a>, String> {
     use Expr::*;
     use LoxType::*;
     match expr {
@@ -88,11 +88,27 @@ pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue, Strin
         },
         ECall{ func, args } => {
             let func = eval(func.as_ref(), env)?;
+
+            let VCallable(fname, params, body, env) = *func else {
+                return Err(format!("{:?} not a function", func));
+            };
+
+            if args.len() != params.len() {
+                return Err(format!("Function {:?} requires {} argument(s)", func, params.len()));
+            }
+
             let mut arg_vals = Vec::new();
             for arg in args.iter() {
-                arg_vals.push(eval(arg, env)?);
+                arg_vals.push(eval(arg, &env)?);
             }
-            todo!();
+
+            let func_env = env.new_child();
+            for (parm, arg) in params.iter().zip(arg_vals) {
+                func_env.var(&parm, Some(arg));
+            }
+
+            eval(&body, &func_env)
+
         },
         EBlock(statments) => {
             let env = env.new_child();
@@ -129,7 +145,7 @@ pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue, Strin
 }
 
 
-pub fn exec<'a>(stmt: &Stmt, env: &'a Environment<'a>) -> Result<LoxValue, String> {
+pub fn exec<'a>(stmt: &Stmt, env: &'a Environment<'a>) -> Result<LoxValue<'a>, String> {
     use Stmt::*;
 
     match stmt {

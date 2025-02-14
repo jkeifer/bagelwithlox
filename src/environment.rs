@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use crate::value::LoxValue;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Environment<'a> {
-    env: RefCell<HashMap<String, Option<LoxValue>>>,
+    env: RefCell<HashMap<String, Option<LoxValue<'a>>>>,
     parent: Option<&'a Environment<'a>>,
 }
 
@@ -22,12 +22,12 @@ impl<'a> Environment<'a> {
         Environment::new(Some(self))
     }
 
-    pub fn var(&self, name: &str, val: Option<LoxValue>) -> Option<LoxValue> {
+    pub fn var(&self, name: &str, val: Option<LoxValue<'a>>) -> Option<LoxValue<'a>> {
         self.env.borrow_mut().insert(name.to_string(), val.clone());
         val.clone()
     }
 
-    pub fn lookup(&self, name: &str) -> Result<LoxValue, String> {
+    pub fn lookup(&self, name: &str) -> Result<LoxValue<'a>, String> {
         match self.env.borrow().get(name) {
             Some(Some(v)) => return Ok(v.clone()),
             Some(None) =>
@@ -40,7 +40,7 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn assign(&self, name: &str, val: LoxValue) -> Result<LoxValue, String> {
+    pub fn assign(&self, name: &str, val: LoxValue<'a>) -> Result<LoxValue<'a>, String> {
         let has = self.env.borrow().contains_key(name);
         match has {
             true => Ok(self.var(name, Some(val)).unwrap()),
