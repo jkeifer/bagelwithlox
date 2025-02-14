@@ -115,12 +115,123 @@ where
     I: Iterator<Item = &'a Token<'a>>
 {
     Some(match token_iter.peek()?.get_type() {
+        For => for_statement(token_iter),
         If => if_statement(token_iter),
         Print => print_statement(token_iter),
         While => while_statement(token_iter),
         LeftBrace => block(token_iter),
         _ => expression_statement(token_iter),
     })
+}
+
+
+fn _for_initializer<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Option<Stmt<'a>>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let token = match token_iter.peek() {
+        Some(token) => token,
+        None => {
+            token_iter.next();
+            let last = token_iter.prev().unwrap();
+            return Err(ParseError::new(
+                last.get_position(),
+                "incomplete for statement".to_string(),
+            ));
+        },
+    };
+
+    match token.get_type() {
+        SemiColon => {
+            token_iter.next();
+            return Ok(None)
+        },
+        Var => Ok(Some(var_declaration(token_iter)?)),
+        _ => Ok(Some(expression_statement(token_iter)?)),
+    }
+}
+
+
+fn _for_condition<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Expr<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let token = match token_iter.peek() {
+        Some(token) => token,
+        None => {
+            token_iter.next();
+            let last = token_iter.prev().unwrap();
+            return Err(ParseError::new(
+                last.get_position(),
+                "incomplete for statement".to_string(),
+            ));
+        },
+    };
+
+    let result = match token.get_type() {
+        SemiColon => {
+            token_iter.next();
+            return Ok(Expr::EBool { value: true })
+        },
+        _ => Ok(expression(token_iter)?),
+    };
+
+    expect(token_iter, SemiColon)?;
+
+    result
+}
+
+
+fn _for_increment<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Option<Expr<'a>>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let token = match token_iter.peek() {
+        Some(token) => token,
+        None => {
+            token_iter.next();
+            let last = token_iter.prev().unwrap();
+            return Err(ParseError::new(
+                last.get_position(),
+                "incomplete for statement".to_string(),
+            ));
+        },
+    };
+
+    match token.get_type() {
+        RightParen => {
+            token_iter.next();
+            return Ok(None)
+        },
+        _ => Ok(Some(expression(token_iter)?)),
+    }
+}
+
+
+fn for_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt<'a>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next();
+    expect(token_iter, LeftParen)?;
+    let init = _for_initializer(token_iter)?;
+    let cond = _for_condition(token_iter)?;
+    let incr = _for_increment(token_iter)?;
+    expect(token_iter, RightParen)?;
+    let mut body = block(token_iter)?;
+
+    if let Some(expr) = incr {
+        body = Stmt::SBlock(vec![body, Stmt::SExprStmt(expr)]);
+    }
+
+    body = Stmt::SWhile(cond, Box::new(body));
+
+    if let Some(stmt) = init {
+        body = Stmt::SBlock(vec![stmt, body]);
+    }
+
+
+    Ok(body)
 }
 
 
