@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use crate::ast::Expr;
+use crate::ast::Stmt;
 use crate::environment::Environment;
 
 
@@ -14,7 +14,7 @@ pub enum LoxType {
     VStr(String),
     VBool(bool),
     VNil,
-    VCallable(String, Vec<Argument>, Expr, Rc<Environment>),
+    VCallable(String, Vec<Argument>, Stmt, Rc<Environment>),
 }
 
 use LoxType::*;

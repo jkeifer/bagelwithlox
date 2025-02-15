@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ops::{Deref, DerefMut}};
 
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -92,9 +92,6 @@ pub enum Expr {
     EAssign{ name: String, expr: Box<Expr>},
     ELogicalOp{ op: Operator, left: Box<Expr>, right: Box<Expr> },
     ECall{ func: Box<Expr>, args: Vec<Expr> },
-    EBlock(Stmts),
-    EIf(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
-    EWhile(Box<Expr>, Box<Expr>),
 }
 
 impl fmt::Display for Expr {
@@ -134,9 +131,6 @@ impl fmt::Display for Expr {
                 func,
                 args,
             ),
-            EBlock(statements) => todo!(),
-            EIf(cond, body, else_) => todo!(),
-            EWhile(cond, body) => todo!(),
         })
     }
 }
@@ -145,23 +139,56 @@ impl fmt::Display for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     SPrint(Expr),
-    SVar{ name: String, value: Option<Expr> },
-    SExprStmt(Expr),
-    SFunc(String, Vec<String>, Expr),
+    SVar(String, Option<Expr>),
+    SExpr(Expr),
+    SFun(String, Vec<String>, Box<Stmt>),
     SReturn(Expr),
+    SBlock(Vec<Stmt>),
+    SIf(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    SWhile(Expr, Box<Stmt>),
+    SEmpty,
 }
 
-pub type Stmts = Vec<Stmt>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Interpretable {
+    IStmt(Stmt),
+    IExpr(Expr),
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Interpretables(Vec<Interpretable>);
+
+impl Deref for Interpretables {
+    type Target = Vec<Interpretable>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Interpretables {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Interpretables {
+    pub fn new() -> Interpretables {
+        Interpretables(Vec::new())
+    }
+}
 
 
 #[derive(Debug, PartialEq)]
 pub struct AST {
-    pub top : Stmts
+    pub top: Interpretables
 }
 
 impl AST {
     pub fn new() -> AST {
-        AST { top: vec![] }
+        AST { top: Interpretables::new() }
     }
 }
 

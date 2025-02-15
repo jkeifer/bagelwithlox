@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
-use super::ast::{Expr, Operator, Stmt};
+use crate::ast::Interpretables;
+
+use super::ast::{Expr, Stmt, Interpretable, Operator};
 use super::environment::Environment;
 use super::value::{LoxValue, LoxType};
 
@@ -109,75 +111,97 @@ pub fn eval(expr: &Expr, env: &Rc<Environment>) -> Result<LoxValue, String> {
                 func_env.var(&parm, Some(arg));
             }
 
-            eval(&body, &func_env)
-        },
-        EBlock(statments) => {
-            let env = Environment::new_child(env);
-            match statments.split_last() {
-                Some(( last_statement, other_statements)) => {
-                    for stmt in other_statements{
-                        exec(stmt, &env)?;
-                    }
-                    exec(last_statement, &env)
-                },
-                None => Ok(LoxValue::new(LoxType::VNil)),
+            match exec(&body, &func_env)? {
+                Some(v) => Ok(v),
+                None => Ok(LoxValue::new(VNil)),
             }
-        },
-        EIf(cond, then, else_) => {
-            if eval(cond, &env)?._is_truthy() {
-                return eval(then, &env);
-            }
-
-            if let Some(else_) = else_ {
-                return eval(else_, &env);
-            }
-
-            Ok(LoxValue::new(LoxType::VNil))
-        },
-        EWhile(cond, body) => {
-            while eval(cond, &env)?._is_truthy() {
-                // need to implement break to return a value
-                eval(body, &env)?;
-            }
-
-            Ok(LoxValue::new(LoxType::VNil))
         },
     }
 }
 
 
-pub fn exec(stmt: &Stmt, env: &Rc<Environment>) -> Result<LoxValue, String> {
-    use Stmt::*;
+fn _add_option<T, E>(x: Result<T, E>) -> Result<Option<T>, E> {
+    match x {
+        Ok(v) => Ok(Some(v)),
+        Err(e) => Err(e),
+    }
+}
 
+
+pub fn exec(stmt: &Stmt, env: &Rc<Environment>) -> Result<Option<LoxValue>, String> {
+    use Stmt::*;
     match stmt {
         SPrint(expr) => {
             println!("{}", eval(expr, env)?.value_string());
-            Ok(LoxValue::new(LoxType::VNil))
         },
-        SExprStmt(expr) => eval(expr, env),
-        SVar{ name, value } => {
+        SExpr(expr) => {
+            eval(expr, env)?;
+        },
+        SVar(name, value) => {
             let value = match value {
                 Some(v) => Some(eval(v, env)?),
                 None => None,
 
             };
             env.var(name, value);
-            Ok(LoxValue::new(LoxType::VNil))
         },
-        SFunc(name, params, body) => {
+        SBlock(stmts) => {
+            let env = Environment::new_child(env);
+            for stmt in stmts{
+                match exec(stmt, &env)? {
+                    Some(v) => return Ok(Some(v)),
+                    None => (),
+                }
+            }
+        },
+        SIf(cond, then, else_) => {
+            if eval(cond, &env)?._is_truthy() {
+                return exec(then, &env);
+            }
+
+            if let Some(else_) = else_ {
+                return exec(else_, &env);
+            }
+        },
+        SWhile(cond, body) => {
+            while eval(cond, &env)?._is_truthy() {
+                match exec(body, &env)? {
+                    Some(v) => return Ok(Some(v)),
+                    None => (),
+                }
+            }
+        },
+        SFun(name, params, body) => {
             let func = LoxValue::new(LoxType::VCallable(
                 name.clone(),
                 params.clone(),
-                body.clone(),
+                *body.clone(),
                 Environment::new_child(&env),
             ));
             env.var(name, Some(func));
-            Ok(LoxValue::new(LoxType::VNil))
         },
-        SReturn(expr) => eval(expr, env),
+        SReturn(expr) => return _add_option(eval(expr, env)),
+        SEmpty => (),
     }
+    Ok(None)
 }
 
+
+pub fn interpret(
+    interpretables: &Interpretables,
+    env: &Rc<Environment>,
+) -> Result<Option<LoxValue>, String> {
+    for interpretable in &**interpretables {
+        match interpretable {
+            Interpretable::IStmt(stmt) => match exec(&stmt, &env)? {
+                Some(v) => return Ok(Some(v)),
+                None => (),
+            },
+            Interpretable::IExpr(expr) => return _add_option(eval(expr, &env)),
+        }
+    };
+    Ok(None)
+}
 
 #[cfg(test)]
 mod tests {
