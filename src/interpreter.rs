@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::parser::parse_expr;
 use crate::tokenizer::Tokens;
 use crate::value::LoxValue;
@@ -8,14 +10,14 @@ use super::parser::parse;
 use super::evaluator::{eval, exec};
 use super::tokenizer::tokenize;
 
-pub struct Interpreter<'a> {
-    env: Environment<'a>,
+pub struct Interpreter {
+    env: Rc<Environment>,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new() -> Interpreter<'a> {
+impl<'a> Interpreter {
+    pub fn new() -> Interpreter {
         Interpreter{
-            env: Environment::new(None),
+            env: Environment::new(),
         }
     }
 

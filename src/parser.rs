@@ -77,9 +77,44 @@ where
     I: Iterator<Item = &'a Token<'a>>
 {
     match token_iter.peek()?.get_type() {
+        Fun => Some(function_declaration(token_iter)),
         Var => Some(var_declaration(token_iter)),
         _ => statement(token_iter),
     }
+}
+
+
+fn _function_params<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Vec<String>, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    let mut params = Vec::new();
+
+    while !_next_is(token_iter, RightParen) {
+        params.push(expect(token_iter, Identifier)?.lexeme.to_string());
+        if _next_is(token_iter, Comma) { token_iter.next(); };
+    }
+
+    // TODO: handle error if too many args?
+    // if params.len() > 255 {
+
+    Ok(params)
+}
+
+
+fn function_declaration<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next(); // consume fun token
+
+    let id = expect(token_iter, Identifier)?;
+    expect(token_iter, LeftParen)?;
+    let params = _function_params(token_iter)?;
+    expect(token_iter, RightParen)?;
+    let body = block(token_iter)?;
+
+    Ok(Stmt::SFunc(id.lexeme.to_string(), params, body))
 }
 
 
@@ -112,6 +147,7 @@ where
 {
     Some(match token_iter.peek()?.get_type() {
         Print => print_statement(token_iter),
+        Return => return_statement(token_iter),
         Equal => assignment_statement(token_iter),
         _ => expression_statement(token_iter),
     })
@@ -169,7 +205,6 @@ where
         _ => Ok(expression(token_iter)?),
     };
 
-    dbg!(1);
     expect(token_iter, SemiColon)?;
 
     result
@@ -252,7 +287,6 @@ where
         If => if_expression(token_iter),
         LeftBrace => block(token_iter),
         other => {
-            dbg!("boo");
             return Err(ParseError::new(
             token.pos,
             format!("expected if or code block after else, found {}", other),
@@ -282,13 +316,27 @@ where
 }
 
 
+fn return_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
+where
+    I: Iterator<Item = &'a Token<'a>>
+{
+    token_iter.next(); // consume return token
+
+    let expr = match _next_is(token_iter, SemiColon) {
+        true => Expr::ENil,
+        false => expression(token_iter)?,
+    };
+    expect(token_iter, SemiColon)?;
+    Ok(Stmt::SReturn(expr))
+}
+
+
 fn print_statement<'a, I>(token_iter: &mut PrevPeekable<I>) -> Result<Stmt, ParseError>
 where
     I: Iterator<Item = &'a Token<'a>>
 {
     token_iter.next();
     let expr = expression(token_iter)?;
-    dbg!(2);
     expect(token_iter, SemiColon)?;
     Ok(Stmt::SPrint(expr))
 }
@@ -343,10 +391,10 @@ where
     let expr = expression(token_iter)?;
 
     // consume a semi colon
-    if _next_is(token_iter, SemiColon) {
-        token_iter.next();
-    }
-    //expect(token_iter, SemiColon)?;
+    //if _next_is(token_iter, SemiColon) {
+    //    token_iter.next();
+    //}
+    expect(token_iter, SemiColon)?;
     Ok(Stmt::SExprStmt(expr))
 }
 
@@ -620,7 +668,7 @@ where
 
     while !_next_is(token_iter, RightParen) {
         args.push(expression(token_iter)?);
-        expect(token_iter, Comma)?;
+        if _next_is(token_iter, Comma) { token_iter.next(); };
     }
 
     // TODO: handle error if too many args?

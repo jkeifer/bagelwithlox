@@ -1,48 +1,50 @@
+use std::rc::Rc;
+
 use super::ast::{Expr, Operator, Stmt};
 use super::environment::Environment;
 use super::value::{LoxValue, LoxType};
 
 
-fn eval_bin_op<'a>(
+fn eval_bin_op(
     op: &Operator,
-    left: &'a LoxValue,
-    right: &'a LoxValue,
-) -> Result<LoxValue<'a>, String> {
+    left: &LoxValue,
+    right: &LoxValue,
+) -> Result<LoxValue, String> {
     use Operator::*;
     match op {
-        Sub => left.sub(right),
-        Add => left.add(right),
-        Mul => left.mul(right),
-        Div => left.div(right),
-        NotEqual => left.neq(right),
-        Equal => left.eq( right),
-        Greater => left.gt(right),
-        GreaterEqual => left.ge(right),
-        Less => left.lt(right),
-        LessEqual => left.le(right),
+        Sub => left.sub(&right),
+        Add => left.add(&right),
+        Mul => left.mul(&right),
+        Div => left.div(&right),
+        NotEqual => left.neq(&right),
+        Equal => left.eq(&right),
+        Greater => left.gt(&right),
+        GreaterEqual => left.ge(&right),
+        Less => left.lt(&right),
+        LessEqual => left.le(&right),
         _ => Err(format!("Unsupported binary operation: {}", op)),
     }
 }
 
 
-fn eval_logical_op<'a>(
+fn eval_logical_op(
     op: &Operator,
-    left: &'a LoxValue,
-    right: &'a LoxValue,
-) -> Result<LoxValue<'a>, String> {
+    left: &LoxValue,
+    right: &LoxValue,
+) -> Result<LoxValue, String> {
     use Operator::*;
     match op {
-        And => left.and(right),
-        Or => left.or(right),
+        And => left.and(&right),
+        Or => left.or(&right),
         _ => Err(format!("Unsupported logical operation: {}", op)),
     }
 }
 
 
-fn eval_unary_op<'a>(
+fn eval_unary_op(
     op: &Operator,
-    operand: &'a LoxValue,
-) -> Result<LoxValue<'a>, String> {
+    operand: &LoxValue,
+) -> Result<LoxValue, String> {
     use Operator::*;
     match op {
         Not => operand.not(),
@@ -52,7 +54,7 @@ fn eval_unary_op<'a>(
 }
 
 
-pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue<'a>, String> {
+pub fn eval(expr: &Expr, env: &Rc<Environment>) -> Result<LoxValue, String> {
     use Expr::*;
     use LoxType::*;
     match expr {
@@ -89,7 +91,7 @@ pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue<'a>, S
         ECall{ func, args } => {
             let func = eval(func.as_ref(), env)?;
 
-            let VCallable(fname, params, body, env) = *func else {
+            let VCallable(_, params, body, _env) = &*func else {
                 return Err(format!("{:?} not a function", func));
             };
 
@@ -99,19 +101,18 @@ pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue<'a>, S
 
             let mut arg_vals = Vec::new();
             for arg in args.iter() {
-                arg_vals.push(eval(arg, &env)?);
+                arg_vals.push(eval(arg, env)?);
             }
 
-            let func_env = env.new_child();
+            let func_env = Environment::new_child(&_env);
             for (parm, arg) in params.iter().zip(arg_vals) {
                 func_env.var(&parm, Some(arg));
             }
 
             eval(&body, &func_env)
-
         },
         EBlock(statments) => {
-            let env = env.new_child();
+            let env = Environment::new_child(env);
             match statments.split_last() {
                 Some(( last_statement, other_statements)) => {
                     for stmt in other_statements{
@@ -145,7 +146,7 @@ pub fn eval<'a>(expr: &Expr, env: &'a Environment<'a>) -> Result<LoxValue<'a>, S
 }
 
 
-pub fn exec<'a>(stmt: &Stmt, env: &'a Environment<'a>) -> Result<LoxValue<'a>, String> {
+pub fn exec(stmt: &Stmt, env: &Rc<Environment>) -> Result<LoxValue, String> {
     use Stmt::*;
 
     match stmt {
@@ -160,11 +161,20 @@ pub fn exec<'a>(stmt: &Stmt, env: &'a Environment<'a>) -> Result<LoxValue<'a>, S
                 None => None,
 
             };
-            match env.var(name, value) {
-                Some(v) => Ok(v),
-                None => Ok(LoxValue::new(LoxType::VNil)),
-            }
+            env.var(name, value);
+            Ok(LoxValue::new(LoxType::VNil))
         },
+        SFunc(name, params, body) => {
+            let func = LoxValue::new(LoxType::VCallable(
+                name.clone(),
+                params.clone(),
+                body.clone(),
+                Environment::new_child(&env),
+            ));
+            env.var(name, Some(func));
+            Ok(LoxValue::new(LoxType::VNil))
+        },
+        SReturn(expr) => eval(expr, env),
     }
 }
 
@@ -176,7 +186,7 @@ mod tests {
     use LoxType::*;
 
     fn run_expr(text : &str) -> LoxValue {
-        let env = Environment::new(None);
+        let env = Environment::new();
         let src = crate::source::Source::from_string(
             text.to_string(),
         );

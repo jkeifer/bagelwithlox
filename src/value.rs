@@ -9,18 +9,18 @@ use crate::environment::Environment;
 pub type Argument = String;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum LoxType<'a> {
+pub enum LoxType {
     VNumb(f64),
     VStr(String),
     VBool(bool),
     VNil,
-    VCallable(String, Vec<Argument>, Box<Expr>, Box<Environment<'a>>),
+    VCallable(String, Vec<Argument>, Expr, Rc<Environment>),
 }
 
 use LoxType::*;
 
 
-impl<'a> fmt::Display for LoxType<'a> {
+impl fmt::Display for LoxType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", match self {
             VNumb(_) => "Number",
@@ -34,17 +34,17 @@ impl<'a> fmt::Display for LoxType<'a> {
 
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct LoxValue<'a>(Rc<LoxType<'a>>);
+pub struct LoxValue(Rc<LoxType>);
 
-impl<'a> Deref for LoxValue<'a> {
-    type Target = LoxType<'a>;
+impl Deref for LoxValue {
+    type Target = LoxType;
 
     fn deref(&self) -> &Self::Target {
         &*self.0
     }
 }
 
-impl<'a, 'b> LoxValue<'a> {
+impl LoxValue {
     pub fn new(t: LoxType) -> LoxValue {
         LoxValue(Rc::new(t))
     }
@@ -73,7 +73,7 @@ impl<'a, 'b> LoxValue<'a> {
         }
     }
 
-    pub fn not(&self) -> Result<LoxValue<'b>, String> {
+    pub fn not(&self) -> Result<LoxValue, String> {
         match &**self {
             VBool(v) => Ok(LoxValue::new(VBool(!v))),
             _ => self.is_truthy().not(),

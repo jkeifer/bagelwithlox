@@ -147,6 +147,8 @@ pub enum Stmt {
     SPrint(Expr),
     SVar{ name: String, value: Option<Expr> },
     SExprStmt(Expr),
+    SFunc(String, Vec<String>, Expr),
+    SReturn(Expr),
 }
 
 pub type Stmts = Vec<Stmt>;
