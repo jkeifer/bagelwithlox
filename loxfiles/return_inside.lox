@@ -1,0 +1,7 @@
+fun rtn () {
+    while (true) {
+        return 10;
+    }
+}
+
+print rtn();

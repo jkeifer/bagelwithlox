@@ -1,0 +1,16 @@
+fun a(x) {
+    var t = 1;
+
+    fun b() {
+        t = t + 1;
+    }
+
+    while x > 0 {
+        b();
+        x = x - 1;
+    }
+
+    return t;
+}
+
+print a(5);

@@ -1,0 +1,18 @@
+// counter.lox
+//
+// Demo of inner functions and closures
+fun makeCounter(i) {
+  fun count() {
+      i = i + 1;
+      print i;
+  }
+  return count;
+}
+
+var c1 = makeCounter(10);
+var c2 = makeCounter(100);
+c1();     // -> 11
+c1();     // -> 12
+c1();     // -> 13
+c2();     // -> 101
+c2();     // -> 102
